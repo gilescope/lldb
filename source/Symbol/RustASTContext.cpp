@@ -1419,6 +1419,14 @@ RustASTContext::CreateFunctionType(const lldb_private::ConstString &name,
   return CompilerType(this, type);
 }
 
+CompilerType
+RustASTContext::CreateVoidType() {
+  ConstString name("()");
+  RustType *type = new RustTuple(name, 0);
+  (*m_types)[name].reset(type);
+  return CompilerType(this, type);
+}
+
 DWARFASTParser *RustASTContext::GetDWARFParser() {
   if (!m_dwarf_ast_parser_ap)
     m_dwarf_ast_parser_ap.reset(new DWARFASTParserRust(*this));

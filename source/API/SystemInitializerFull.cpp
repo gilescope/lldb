@@ -27,6 +27,7 @@
 #include "lldb/Symbol/GoASTContext.h"
 #include "lldb/Symbol/JavaASTContext.h"
 #include "lldb/Symbol/OCamlASTContext.h"
+#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Utility/Timer.h"
 
 #include "Plugins/ABI/MacOSX-arm/ABIMacOSX_arm.h"
@@ -290,6 +291,7 @@ void SystemInitializerFull::Initialize() {
   GoASTContext::Initialize();
   JavaASTContext::Initialize();
   OCamlASTContext::Initialize();
+  RustASTContext::Initialize();
 
   ABIMacOSX_i386::Initialize();
   ABIMacOSX_arm::Initialize();
@@ -416,6 +418,7 @@ void SystemInitializerFull::Terminate() {
   GoASTContext::Terminate();
   JavaASTContext::Terminate();
   OCamlASTContext::Terminate();
+  RustASTContext::Terminate();
 
   ABIMacOSX_i386::Terminate();
   ABIMacOSX_arm::Terminate();

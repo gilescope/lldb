@@ -685,9 +685,9 @@ bool RustASTContext::IsTypedefType(lldb::opaque_compiler_type_t type) {
 bool RustASTContext::IsVoidType(lldb::opaque_compiler_type_t type) {
   if (!type)
     return false;
-  // FIXME do we need to consider the "!" type as well?
   RustTuple *tuple = static_cast<RustType *>(type)->AsTuple();
-  return tuple && tuple->Name().IsEmpty() && tuple->FieldCount() == 0;
+  return tuple && tuple->Name().AsCString() &&
+    strcmp(tuple->Name().AsCString(), "()") == 0 && tuple->FieldCount() == 0;
 }
 
 bool RustASTContext::SupportsLanguage(lldb::LanguageType language) {

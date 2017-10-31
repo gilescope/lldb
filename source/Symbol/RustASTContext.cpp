@@ -341,9 +341,11 @@ public:
 
 class RustFunction : public RustType {
 public:
-  RustFunction (const ConstString &name, const CompilerType &return_type,
+  RustFunction (const ConstString &name, uint64_t byte_size,
+		const CompilerType &return_type,
 		const std::vector<CompilerType> &&arguments)
     : RustType(name),
+      m_byte_size(byte_size),
       m_arguments(std::move(arguments))
   {
   }
@@ -369,11 +371,12 @@ public:
   }
 
   uint64_t ByteSize() const override {
-    return 8;			// FIXME
+    return m_byte_size;
   }
 
 private:
 
+  uint64_t m_byte_size;
   CompilerType m_return_type;
   std::vector<CompilerType> m_arguments;
 };
@@ -1438,7 +1441,7 @@ RustASTContext::CreateFunctionType(const lldb_private::ConstString &name,
 				   const std::vector<CompilerType> &&params) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
-  RustType *type = new RustFunction(name, return_type, std::move(params));
+  RustType *type = new RustFunction(name, m_pointer_byte_size, return_type, std::move(params));
   m_types[name].reset(type);
   return CompilerType(this, type);
 }

@@ -179,9 +179,11 @@ private:
 class RustPointer : public RustType {
 public:
   // Pointers and references are handled similarly.
-  RustPointer(const ConstString &name, const CompilerType &pointee, bool is_reference)
+  RustPointer(const ConstString &name, const CompilerType &pointee, uint64_t byte_size,
+	      bool is_reference)
     : RustType(name),
       m_pointee(pointee),
+      m_byte_size(byte_size),
       m_is_reference(is_reference)
   {}
   NO_COPY(RustPointer);
@@ -208,12 +210,13 @@ public:
   }
 
   uint64_t ByteSize() const override {
-    return 8;			// FIXME
+    return m_byte_size;
   }
 
 private:
 
   CompilerType m_pointee;
+  uint64_t m_byte_size;
   bool m_is_reference;
 };
 
@@ -837,7 +840,8 @@ CompilerType RustASTContext::GetPointerType(lldb::opaque_compiler_type_t type) {
   ConstString pointer_name(std::string("*") + type_name.GetCString());
   if (RustType *cached = FindCachedType(pointer_name))
     return CompilerType(this, cached);
-  RustType *pointer = new RustPointer(pointer_name, CompilerType(this, type), false);
+  RustType *pointer = new RustPointer(pointer_name, CompilerType(this, type),
+				      m_pointer_byte_size, false);
   m_types[pointer_name].reset(pointer);
   return CompilerType(this, pointer);
 }

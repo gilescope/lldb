@@ -234,6 +234,7 @@ TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
     break;
 
   case DW_TAG_pointer_type:
+    m_ast.SetAddressByteSize(die.GetCU()->GetAddressByteSize());
     encoding_data_type = Type::eEncodingIsPointerUID;
     break;
   case DW_TAG_typedef:

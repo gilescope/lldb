@@ -39,8 +39,8 @@ class IterableDIEAttrs
 {
 public:
   IterableDIEAttrs(const DWARFDIE &die)
-    : m_size(die.GetAttributes(m_attrs))
   {
+    m_size = die.GetAttributes(m_attrs);
   }
 
   IterableDIEAttrs(const IterableDIEAttrs &) = delete;

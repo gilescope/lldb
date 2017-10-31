@@ -394,11 +394,12 @@ public:
                        bool *is_rvalue = nullptr) override;
 
 private:
-  typedef std::map<ConstString, std::unique_ptr<RustType>> TypeMap;
   int m_pointer_byte_size;
   int m_int_byte_size;
-  std::unique_ptr<TypeMap> m_types;
+  std::map<ConstString, std::unique_ptr<RustType>> m_types;
   std::unique_ptr<DWARFASTParser> m_dwarf_ast_parser_ap;
+
+  RustType *FindCachedType(const lldb_private::ConstString &name);
 
   RustASTContext(const RustASTContext &) = delete;
   const RustASTContext &operator=(const RustASTContext &) = delete;

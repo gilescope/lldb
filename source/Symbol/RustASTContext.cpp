@@ -58,7 +58,7 @@ public:
 
   virtual ~RustType() {}
 
-  const ConstString &Name() const { return m_name; }
+  ConstString Name() const { return m_name; }
 
   virtual lldb::Format Format() const {
     return eFormatBytes;
@@ -411,8 +411,9 @@ using namespace lldb_private;
 RustASTContext::RustASTContext()
     : TypeSystem(eKindRust),
       m_pointer_byte_size(0),
-      m_int_byte_size(0),
-      m_types(new TypeMap) {}
+      m_int_byte_size(0)
+{
+}
 
 RustASTContext::~RustASTContext() {}
 
@@ -835,10 +836,10 @@ CompilerType RustASTContext::GetPointerType(lldb::opaque_compiler_type_t type) {
     return CompilerType();
   ConstString type_name = GetTypeName(type);
   ConstString pointer_name(std::string("*") + type_name.GetCString());
-  RustType *pointer = (*m_types)[pointer_name].get();
+  RustType *pointer = m_types[pointer_name].get();
   if (pointer == nullptr) {
     pointer = new RustPointer(pointer_name, CompilerType(this, type), false);
-    (*m_types)[pointer_name].reset(pointer);
+    m_types[pointer_name].reset(pointer);
   }
   return CompilerType(this, pointer);
 }
@@ -1353,45 +1354,64 @@ void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type, Stre
   s->PutCString(name.AsCString());
 }
 
+RustType *RustASTContext::FindCachedType(const lldb_private::ConstString &name) {
+  auto result = m_types.find(name);
+  if (result == m_types.end ())
+    return nullptr;
+  return result->second.get();
+}
+
 CompilerType RustASTContext::CreateBoolType(const lldb_private::ConstString &name) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustBool(name);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
 CompilerType RustASTContext::CreateIntegralType(const lldb_private::ConstString &name,
 						bool is_signed,
 						uint64_t byte_size) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustIntegral(name, is_signed, byte_size);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
 CompilerType RustASTContext::CreateFloatType(const lldb_private::ConstString &name,
 					     uint64_t byte_size) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustFloat(name, byte_size);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
 CompilerType RustASTContext::CreateArrayType(const ConstString &name,
 					     const CompilerType &element_type,
 					     uint64_t length) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustArray(name, length, element_type);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
 CompilerType RustASTContext::CreateTypedefType(const ConstString &name, CompilerType impl) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustTypedef(name, impl);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
 CompilerType
 RustASTContext::CreateStructType(const lldb_private::ConstString &name, uint32_t byte_size) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustStruct(name, byte_size);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
@@ -1414,16 +1434,20 @@ CompilerType
 RustASTContext::CreateFunctionType(const lldb_private::ConstString &name,
 				   const CompilerType &return_type,
 				   const std::vector<CompilerType> &&params) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustFunction(name, return_type, std::move(params));
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 
 CompilerType
 RustASTContext::CreateVoidType() {
   ConstString name("()");
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
   RustType *type = new RustTuple(name, 0);
-  (*m_types)[name].reset(type);
+  m_types[name].reset(type);
   return CompilerType(this, type);
 }
 

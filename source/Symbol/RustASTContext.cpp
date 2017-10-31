@@ -605,7 +605,6 @@ bool RustASTContext::IsIntegerType(lldb::opaque_compiler_type_t type,
   if (!type)
     return false;
 
-  // FIXME bool?
   RustIntegral *inttype = static_cast<RustType *>(type)->AsInteger();
   if (inttype) {
     is_signed = inttype->IsSigned();

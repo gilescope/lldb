@@ -223,8 +223,6 @@ TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
     resolve_state = Type::eResolveStateFull;
     if (encoding == DW_ATE_boolean)
       compiler_type = m_ast.CreateBoolType(type_name_const_str);
-    // else if (encoding == DW_ATE_void)
-    //   compiler_type = m_ast.CreateVoidType();
     else if (encoding == DW_ATE_float)
       compiler_type = m_ast.CreateFloatType(type_name_const_str, byte_size);
     else if (encoding == DW_ATE_signed || encoding == DW_ATE_unsigned)

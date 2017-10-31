@@ -366,6 +366,16 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
   return type_sp;
 }
 
+struct Field {
+  Field() : name(nullptr), byte_offset(-1)
+  {
+  }
+
+  const char *name;
+  DWARFFormValue type;
+  uint32_t byte_offset;
+};
+
 TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   bool byte_size_valid = false;
   uint64_t byte_size = 0;
@@ -415,6 +425,60 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 			 byte_size, NULL, LLDB_INVALID_UID,
 			 Type::eEncodingIsUID, &decl, compiler_type,
 			 Type::eResolveStateForward));
+
+
+  // We construct a list of fields and then apply them later so that
+  // we can (in the future) analyze the fields to see what sort of
+  // structure this really is.
+  std::vector<Field> fields;
+  ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
+  for (auto &&child_die : IterableDIEChildren(die)) {
+    if (child_die.Tag() == DW_TAG_member) {
+      Field new_field;
+
+      for (auto &&attr : IterableDIEAttrs(child_die)) {
+	switch (attr.first) {
+	case DW_AT_name:
+	  new_field.name = attr.second.AsCString();
+	  break;
+	case DW_AT_type:
+	  new_field.type = attr.second;
+	  break;
+	case DW_AT_data_member_location:
+	  if (attr.second.BlockData()) {
+	    Value initialValue(0);
+	    Value memberOffset(0);
+	    const DWARFDataExtractor &debug_info_data =
+	      child_die.GetDWARF()->get_debug_info_data();
+	    uint32_t block_length = attr.second.Unsigned();
+	    uint32_t block_offset = attr.second.BlockData() - debug_info_data.GetDataStart();
+	    if (DWARFExpression::Evaluate(
+                    NULL, // ExecutionContext *
+		    NULL, // RegisterContext *
+		    module_sp, debug_info_data, die.GetCU(), block_offset,
+		    block_length, eRegisterKindDWARF, &initialValue, NULL,
+		    memberOffset, NULL)) {
+	      new_field.byte_offset = memberOffset.ResolveValue(NULL).UInt();
+	    }
+	  } else {
+	    new_field.byte_offset = attr.second.Unsigned();
+	  }
+	  break;
+	}
+      }
+
+      fields.push_back(new_field);
+    }
+  }
+
+  for (auto &&field : fields) {
+    Type *type = die.ResolveTypeUID(DIERef(field.type));
+    if (type) {
+      ConstString name(field.name);
+      CompilerType member_type = type->GetFullCompilerType();
+      m_ast.AddFieldToStruct(compiler_type, name, member_type, field.byte_offset);
+    }
+  }
 
   // Add our type to the unique type map so we don't
   // end up creating many copies of the same type over
@@ -540,94 +604,6 @@ bool DWARFASTParserRust::CompleteTypeFromDWARF(const DWARFDIE &die,
 					       CompilerType &compiler_type) {
   // We don't currently use type completion for Rust.
   return bool(die);
-}
-
-size_t DWARFASTParserRust::ParseChildMembers(const SymbolContext &sc,
-                                           const DWARFDIE &parent_die,
-                                           CompilerType &class_compiler_type) {
-  size_t count = 0;
-  uint32_t member_idx = 0;
-
-  ModuleSP module_sp = parent_die.GetDWARF()->GetObjectFile()->GetModule();
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(class_compiler_type.GetTypeSystem());
-  if (ast == nullptr)
-    return 0;
-
-  for (DWARFDIE die = parent_die.GetFirstChild(); die.IsValid();
-       die = die.GetSibling()) {
-    dw_tag_t tag = die.Tag();
-
-    switch (tag) {
-    case DW_TAG_member: {
-      DWARFAttributes attributes;
-      const size_t num_attributes = die.GetAttributes(attributes);
-      if (num_attributes > 0) {
-        Declaration decl;
-        const char *name = NULL;
-
-        DWARFFormValue encoding_uid;
-        uint32_t member_byte_offset = UINT32_MAX;
-        uint32_t i;
-        for (i = 0; i < num_attributes; ++i) {
-          const dw_attr_t attr = attributes.AttributeAtIndex(i);
-          DWARFFormValue form_value;
-          if (attributes.ExtractFormValueAtIndex(i, form_value)) {
-            switch (attr) {
-            case DW_AT_name:
-              name = form_value.AsCString();
-              break;
-            case DW_AT_type:
-              encoding_uid = form_value;
-              break;
-            case DW_AT_data_member_location:
-              if (form_value.BlockData()) {
-                Value initialValue(0);
-                Value memberOffset(0);
-                const DWARFDataExtractor &debug_info_data =
-                    die.GetDWARF()->get_debug_info_data();
-                uint32_t block_length = form_value.Unsigned();
-                uint32_t block_offset =
-                    form_value.BlockData() - debug_info_data.GetDataStart();
-                if (DWARFExpression::Evaluate(
-                        NULL, // ExecutionContext *
-                        NULL, // RegisterContext *
-                        module_sp, debug_info_data, die.GetCU(), block_offset,
-                        block_length, eRegisterKindDWARF, &initialValue, NULL,
-                        memberOffset, NULL)) {
-                  member_byte_offset = memberOffset.ResolveValue(NULL).UInt();
-                }
-              } else {
-                // With DWARF 3 and later, if the value is an integer constant,
-                // this form value is the offset in bytes from the beginning
-                // of the containing entity.
-                member_byte_offset = form_value.Unsigned();
-              }
-              break;
-
-            default:
-              break;
-            }
-          }
-        }
-
-        Type *member_type = die.ResolveTypeUID(DIERef(encoding_uid));
-        if (member_type) {
-          CompilerType member_rust_type = member_type->GetFullCompilerType();
-          ConstString name_const_str(name);
-          m_ast.AddFieldToStruct(class_compiler_type, name_const_str,
-                                 member_rust_type, member_byte_offset);
-        }
-      }
-      ++member_idx;
-    } break;
-
-    default:
-      break;
-    }
-  }
-
-  return count;
 }
 
 Function *DWARFASTParserRust::ParseFunctionFromDWARF(const SymbolContext &sc,

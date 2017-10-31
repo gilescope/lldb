@@ -71,10 +71,6 @@ private:
   lldb::TypeSP ParseFunctionType(const DWARFDIE &die);
   lldb::TypeSP ParseStructureType(const DWARFDIE &die);
 
-  size_t ParseChildMembers(const lldb_private::SymbolContext &sc,
-                           const DWARFDIE &die,
-                           lldb_private::CompilerType &class_compiler_type);
-
   lldb_private::RustASTContext &m_ast;
 };
 

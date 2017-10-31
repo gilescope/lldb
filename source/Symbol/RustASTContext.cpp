@@ -836,11 +836,10 @@ CompilerType RustASTContext::GetPointerType(lldb::opaque_compiler_type_t type) {
     return CompilerType();
   ConstString type_name = GetTypeName(type);
   ConstString pointer_name(std::string("*") + type_name.GetCString());
-  RustType *pointer = m_types[pointer_name].get();
-  if (pointer == nullptr) {
-    pointer = new RustPointer(pointer_name, CompilerType(this, type), false);
-    m_types[pointer_name].reset(pointer);
-  }
+  if (RustType *cached = FindCachedType(pointer_name))
+    return CompilerType(this, cached);
+  RustType *pointer = new RustPointer(pointer_name, CompilerType(this, type), false);
+  m_types[pointer_name].reset(pointer);
   return CompilerType(this, pointer);
 }
 

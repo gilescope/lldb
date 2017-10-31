@@ -395,7 +395,6 @@ public:
 
 private:
   int m_pointer_byte_size;
-  int m_int_byte_size;
   std::map<ConstString, std::unique_ptr<RustType>> m_types;
   std::unique_ptr<DWARFASTParser> m_dwarf_ast_parser_ap;
 

@@ -410,8 +410,7 @@ using namespace lldb_private;
 
 RustASTContext::RustASTContext()
     : TypeSystem(eKindRust),
-      m_pointer_byte_size(0),
-      m_int_byte_size(0)
+      m_pointer_byte_size(0)
 {
 }
 

@@ -231,10 +231,13 @@ TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
 					       byte_size);
     break;
 
+    // Note that, currently, rustc does not emit DW_TAG_reference_type
+    // - references are distinguished by name.
   case DW_TAG_pointer_type:
     m_ast.SetAddressByteSize(die.GetCU()->GetAddressByteSize());
     encoding_data_type = Type::eEncodingIsPointerUID;
     break;
+
   case DW_TAG_typedef:
   case DW_TAG_template_type_parameter: {
     encoding_data_type = Type::eEncodingIsTypedefUID;
@@ -248,7 +251,7 @@ TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
   }
 
   default:
-    // Should have been filtered by the outer switch.
+    // Should have been filtered by the caller.
     assert(0);
   }
 

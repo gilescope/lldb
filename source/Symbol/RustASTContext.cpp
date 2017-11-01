@@ -1418,6 +1418,15 @@ RustASTContext::CreateStructType(const lldb_private::ConstString &name, uint32_t
   return CompilerType(this, type);
 }
 
+CompilerType
+RustASTContext::CreateTupleType(const lldb_private::ConstString &name, uint32_t byte_size) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
+  RustType *type = new RustTuple(name, byte_size);
+  m_types[name].reset(type);
+  return CompilerType(this, type);
+}
+
 void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
 				      const lldb_private::ConstString &name,
 				      const CompilerType &field_type,

@@ -416,24 +416,17 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     }
   }
 
-  bool compiler_type_was_created = false;
-  CompilerType compiler_type(&m_ast,
-			     dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
-  if (!compiler_type) {
-    compiler_type_was_created = true;
-    compiler_type = m_ast.CreateStructType(type_name_const_str, byte_size);
-  }
-
-  type_sp.reset(new Type(die.GetID(), dwarf, type_name_const_str,
-			 byte_size, NULL, LLDB_INVALID_UID,
-			 Type::eEncodingIsUID, &decl, compiler_type,
-			 Type::eResolveStateForward));
-
-
   // We construct a list of fields and then apply them later so that
-  // we can (in the future) analyze the fields to see what sort of
-  // structure this really is.
+  // we can analyze the fields to see what sort of structure this
+  // really is.
   std::vector<Field> fields;
+  // Currently, rustc emits tuples with a name starting with "("; but
+  // there's no way to distinguish a zero-length struct from a
+  // zero-length tuple struct.
+  bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
+  bool numeric_names = true;
+  unsigned offset = 0;
+
   ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
     if (child_die.Tag() == DW_TAG_member) {
@@ -470,9 +463,44 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 	}
       }
 
+      if (numeric_names) {
+	char buf[32];
+	snprintf (buf, sizeof (buf), "__%d", offset);
+	if (!new_field.name || strcmp(new_field.name, buf) != 0)
+	  numeric_names = false;
+      }
+
       fields.push_back(new_field);
     }
   }
+
+  if (!numeric_names) {
+    // If the field name checking failed, maybe we don't have a tuple
+    // after all, somehow.
+    is_tuple = false;
+  } else if (!is_tuple) {
+    // If we saw numeric names in sequence, we may have a tuple
+    // struct; but if there were no fields, then we can't tell and so
+    // we arbitrarily choose an empty struct.
+    is_tuple = !fields.empty();
+  }
+
+  bool compiler_type_was_created = false;
+  CompilerType compiler_type(&m_ast,
+			     dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
+  if (!compiler_type) {
+    compiler_type_was_created = true;
+    if (is_tuple)
+      compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size);
+    else
+      compiler_type = m_ast.CreateStructType(type_name_const_str, byte_size);
+  }
+
+  type_sp.reset(new Type(die.GetID(), dwarf, type_name_const_str,
+			 byte_size, NULL, LLDB_INVALID_UID,
+			 Type::eEncodingIsUID, &decl, compiler_type,
+			 Type::eResolveStateForward));
+
 
   for (auto &&field : fields) {
     Type *type = die.ResolveTypeUID(DIERef(field.type));

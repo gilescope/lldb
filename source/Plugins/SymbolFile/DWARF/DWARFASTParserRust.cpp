@@ -380,6 +380,8 @@ struct Field {
 };
 
 TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
+  const bool is_union = die.Tag() == DW_TAG_union_type;
+
   bool byte_size_valid = false;
   uint64_t byte_size = 0;
   const char *type_name_cstr = NULL;
@@ -490,7 +492,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 			     dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
   if (!compiler_type) {
     compiler_type_was_created = true;
-    if (is_tuple)
+    if (is_union)
+      compiler_type = m_ast.CreateUnionType(type_name_const_str, byte_size);
+    else if (is_tuple)
       compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size);
     else
       compiler_type = m_ast.CreateStructType(type_name_const_str, byte_size);
@@ -572,7 +576,7 @@ TypeSP DWARFASTParserRust::ParseTypeFromDWARF(
 	type_sp = ParseSimpleType(die);
 	break;
 
-	// case DW_TAG_union_type:  FIXME
+      case DW_TAG_union_type:
       case DW_TAG_structure_type:
 	type_sp = ParseStructureType(die);
 	break;

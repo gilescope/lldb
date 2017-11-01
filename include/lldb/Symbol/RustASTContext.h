@@ -117,6 +117,7 @@ public:
 
   CompilerType CreateStructType(const ConstString &name, uint32_t byte_size);
   CompilerType CreateTupleType(const ConstString &name, uint32_t byte_size);
+  CompilerType CreateUnionType(const ConstString &name, uint32_t byte_size);
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,

@@ -339,6 +339,15 @@ public:
   RustStruct *AsStruct() override { return this; }
 };
 
+class RustUnion : public RustAggregateBase {
+public:
+  RustUnion(const ConstString &name, uint64_t byte_size)
+    : RustAggregateBase(name, byte_size)
+  {}
+
+  NO_COPY(RustUnion);
+};
+
 class RustFunction : public RustType {
 public:
   RustFunction (const ConstString &name, uint64_t byte_size,
@@ -1423,6 +1432,15 @@ RustASTContext::CreateTupleType(const lldb_private::ConstString &name, uint32_t 
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustTuple(name, byte_size);
+  m_types[name].reset(type);
+  return CompilerType(this, type);
+}
+
+CompilerType
+RustASTContext::CreateUnionType(const lldb_private::ConstString &name, uint32_t byte_size) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
+  RustType *type = new RustUnion(name, byte_size);
   m_types[name].reset(type);
   return CompilerType(this, type);
 }

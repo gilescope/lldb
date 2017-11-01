@@ -940,7 +940,6 @@ uint32_t RustASTContext::GetNumFields(lldb::opaque_compiler_type_t type) {
     return tdef->UnderlyingType().GetNumFields();
   if (RustAggregateBase *a = t->AsAggregate())
     return a->FieldCount();
-  // FIXME arrays?
   return 0;
 }
 

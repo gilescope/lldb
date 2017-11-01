@@ -796,7 +796,7 @@ int RustASTContext::GetFunctionArgumentCount(lldb::opaque_compiler_type_t type) 
 
 CompilerType
 RustASTContext::GetFunctionArgumentTypeAtIndex(lldb::opaque_compiler_type_t type,
-                                             size_t idx) {
+					       size_t idx) {
   return GetFunctionArgumentAtIndex(type, idx);
 }
 
@@ -817,7 +817,7 @@ size_t RustASTContext::GetNumMemberFunctions(lldb::opaque_compiler_type_t type) 
 
 TypeMemberFunctionImpl
 RustASTContext::GetMemberFunctionAtIndex(lldb::opaque_compiler_type_t type,
-                                       size_t idx) {
+					 size_t idx) {
   return TypeMemberFunctionImpl();
 }
 
@@ -867,7 +867,7 @@ CompilerType RustASTContext::GetBasicTypeFromAST(lldb::BasicType basic_type) {
 
 CompilerType
 RustASTContext::GetBuiltinTypeForEncodingAndBitSize(lldb::Encoding encoding,
-                                                  size_t bit_size) {
+						    size_t bit_size) {
   return CompilerType();
 }
 
@@ -1110,12 +1110,12 @@ RustASTContext::ConvertStringToFloatValue(lldb::opaque_compiler_type_t type,
 #define DEPTH_INCREMENT 2
 
 void RustASTContext::DumpValue(lldb::opaque_compiler_type_t type,
-                             ExecutionContext *exe_ctx, Stream *s,
-                             lldb::Format format, const DataExtractor &data,
-                             lldb::offset_t data_byte_offset,
-                             size_t data_byte_size, uint32_t bitfield_bit_size,
-                             uint32_t bitfield_bit_offset, bool show_types,
-                             bool show_summary, bool verbose, uint32_t depth) {
+			       ExecutionContext *exe_ctx, Stream *s,
+			       lldb::Format format, const DataExtractor &data,
+			       lldb::offset_t data_byte_offset,
+			       size_t data_byte_size, uint32_t bitfield_bit_size,
+			       uint32_t bitfield_bit_offset, bool show_types,
+			       bool show_summary, bool verbose, uint32_t depth) {
   if (IsTypedefType(type))
     type = GetTypedefedType(type).GetOpaqueQualType();
   if (!type)

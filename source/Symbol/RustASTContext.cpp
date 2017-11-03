@@ -119,7 +119,7 @@ public:
   NO_COPY(RustIntegral);
 
   lldb::Format Format() const override {
-    return m_is_signed ? eFormatDefault : eFormatUnsigned;
+    return m_is_signed ? eFormatDecimal : eFormatUnsigned;
   }
 
   bool IsSigned() const { return m_is_signed; }

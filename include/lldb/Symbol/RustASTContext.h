@@ -105,8 +105,7 @@ public:
   CompilerType CreateFloatType(const lldb_private::ConstString &name,
 			       uint64_t byte_size);
 
-  CompilerType CreateArrayType(const ConstString &name,
-                               const CompilerType &element_type,
+  CompilerType CreateArrayType(const CompilerType &element_type,
                                uint64_t length);
 
   CompilerType CreateTypedefType(const ConstString &name, CompilerType impl);

@@ -1,5 +1,7 @@
 """Test DWARF type parsing for Rust."""
 
+from __future__ import print_function
+
 import lldb
 import os
 
@@ -21,6 +23,7 @@ class TestRustASTContext(TestBase):
         self.init_typelist()
         self.check_types()
         self.check_main_vars()
+        self.check_main_function()
 
     def setUp(self):
         # Call super's setUp().
@@ -75,8 +78,6 @@ class TestRustASTContext(TestBase):
             ('f64', 8, '7.5'),
         ]:
             self._typelist.append((name, 'v' + name, size, value))
-        # FIXME value should not be None here
-        self._typelist.append(('()', 'empty', 0, None))
 
     def check_type(self, name, size, typeclass):
         tl = self.target().FindTypes(name)
@@ -97,8 +98,11 @@ class TestRustASTContext(TestBase):
 
     def check_main_vars(self):
         mytypelist = self._typelist[:]
+        # FIXME value should not be None here
+        # Not in _typelist because it isn't eTypeClassBuiltin.
+        self._typelist.append(('()', 'empty', 0, None))
         # FIXME Not in _typelist because we can't currently look up
-        # this type by name.
+        # this type by name; but also not eTypeClassBuiltin.
         # FIXME the value here as well
         mytypelist.append(('[i8; 4]', 'vi8array', 4, None))
 
@@ -108,3 +112,9 @@ class TestRustASTContext(TestBase):
             # FIXME the None check is a temporary hack.
             if value is not None:
                 self.assertEqual(value, v.value)
+
+    def check_main_function(self):
+        fn_type = self.frame().GetFunction().GetType()
+        self.assertTrue(fn_type.IsFunctionType())
+        self.assertEqual(len(fn_type.GetFunctionArgumentTypes()), 0)
+        self.assertEqual(fn_type.GetFunctionReturnType().name, '()')

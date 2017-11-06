@@ -355,6 +355,7 @@ public:
 		const std::vector<CompilerType> &&arguments)
     : RustType(name),
       m_byte_size(byte_size),
+      m_return_type(return_type),
       m_arguments(std::move(arguments))
   {
   }
@@ -811,13 +812,13 @@ RustASTContext::GetFunctionArgumentTypeAtIndex(lldb::opaque_compiler_type_t type
 
 CompilerType
 RustASTContext::GetFunctionReturnType(lldb::opaque_compiler_type_t type) {
-  CompilerType result;
   if (type) {
     RustFunction *t = static_cast<RustType *>(type)->AsFunction();
-    if (t)
-      result = t->ReturnType();
+    if (t) {
+      return t->ReturnType();
+    }
   }
-  return result;
+  return CompilerType();
 }
 
 size_t RustASTContext::GetNumMemberFunctions(lldb::opaque_compiler_type_t type) {
@@ -1400,15 +1401,14 @@ CompilerType RustASTContext::CreateFloatType(const lldb_private::ConstString &na
   return CompilerType(this, type);
 }
 
-CompilerType RustASTContext::CreateArrayType(const ConstString &name,
-					     const CompilerType &element_type,
+CompilerType RustASTContext::CreateArrayType(const CompilerType &element_type,
 					     uint64_t length) {
-  std::string xname = std::string("[") + element_type.GetTypeName().AsCString();
+  std::string name = std::string("[") + element_type.GetTypeName().AsCString();
   if (length != 0) {
-    xname = xname + "; " + std::to_string(length);
+    name = name + "; " + std::to_string(length);
   }
-  xname += "]";
-  ConstString newname(xname);
+  name += "]";
+  ConstString newname(name);
 
   if (RustType *cached = FindCachedType(newname))
     return CompilerType(this, cached);

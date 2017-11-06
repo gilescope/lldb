@@ -262,17 +262,10 @@ TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
 }
 
 TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
-  const char *type_name_cstr = NULL;
-  ConstString type_name_const_str;
-
   lldb::user_id_t type_die_offset = DW_INVALID_OFFSET;
 
   for (auto &&value : IterableDIEAttrs(die)) {
     switch (value.first) {
-    case DW_AT_name:
-      type_name_cstr = value.second.AsCString();
-      type_name_const_str.SetCString(type_name_cstr);
-      break;
     case DW_AT_type:
       type_die_offset = value.second.Reference();
       break;
@@ -300,8 +293,9 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
   }
 
   CompilerType array_element_type = element_type->GetForwardCompilerType();
-  compiler_type = m_ast.CreateArrayType(type_name_const_str, array_element_type, count);
+  compiler_type = m_ast.CreateArrayType(array_element_type, count);
 
+  ConstString type_name_const_str = compiler_type.GetTypeName();
   TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str,
 			  element_type->GetByteSize(), NULL, type_die_offset,
 			  Type::eEncodingIsUID, Declaration(), compiler_type,
@@ -341,6 +335,10 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
       break;
     }
     }
+  }
+
+  if (!return_type) {
+    return_type = m_ast.CreateVoidType();
   }
 
   std::vector<CompilerType> function_param_types;

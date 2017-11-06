@@ -22,5 +22,7 @@ fn main() {
     let vf32: f32 = 5.25;
     let vf64: f64 = 7.5;
 
+    let empty = ();
+
     do_nothing();               // breakpoint
 }

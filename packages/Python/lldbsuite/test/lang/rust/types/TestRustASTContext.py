@@ -58,7 +58,8 @@ class TestRustASTContext(TestBase):
 
     def init_typelist(self):
         address_size = self.target().GetAddressByteSize()
-        self._typelist = [
+        self._typelist = []
+        for (name, size, value) in [
             ('bool', 1, 'true'),
             ('i8', 1, '-23'),
             ('u8', 1, '23'),
@@ -72,7 +73,10 @@ class TestRustASTContext(TestBase):
             ('usize', address_size, '23232323'),
             ('f32', 4, '5.25'),
             ('f64', 8, '7.5'),
-        ]
+        ]:
+            self._typelist.append((name, 'v' + name, size, value))
+        # FIXME value should not be None here
+        self._typelist.append(('()', 'empty', 0, None))
 
     def check_type(self, name, size, typeclass):
         tl = self.target().FindTypes(name)
@@ -83,7 +87,7 @@ class TestRustASTContext(TestBase):
         self.assertEqual(size, t.size)
 
     def check_types(self):
-        for (name, size, value) in self._typelist:
+        for (name, vname, size, value) in self._typelist:
             self.check_type(name, size, lldb.eTypeClassBuiltin)
 
     def var(self, name):
@@ -92,7 +96,9 @@ class TestRustASTContext(TestBase):
         return var
 
     def check_main_vars(self):
-        for (name, size, value) in self._typelist:
-            v = self.var('v' + name)
+        for (name, vname, size, value) in self._typelist:
+            v = self.var(vname)
             self.assertEqual(name, v.GetType().name)
-            self.assertEqual(value, v.value)
+            # FIXME the None check is a temporary hack.
+            if value is not None:
+                self.assertEqual(value, v.value)

@@ -96,7 +96,13 @@ class TestRustASTContext(TestBase):
         return var
 
     def check_main_vars(self):
-        for (name, vname, size, value) in self._typelist:
+        mytypelist = self._typelist[:]
+        # FIXME Not in _typelist because we can't currently look up
+        # this type by name.
+        # FIXME the value here as well
+        mytypelist.append(('[i8; 4]', 'vi8array', 4, None))
+
+        for (name, vname, size, value) in mytypelist:
             v = self.var(vname)
             self.assertEqual(name, v.GetType().name)
             # FIXME the None check is a temporary hack.

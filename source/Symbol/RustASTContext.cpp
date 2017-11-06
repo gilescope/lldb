@@ -1403,10 +1403,17 @@ CompilerType RustASTContext::CreateFloatType(const lldb_private::ConstString &na
 CompilerType RustASTContext::CreateArrayType(const ConstString &name,
 					     const CompilerType &element_type,
 					     uint64_t length) {
-  if (RustType *cached = FindCachedType(name))
+  std::string xname = std::string("[") + element_type.GetTypeName().AsCString();
+  if (length != 0) {
+    xname = xname + "; " + std::to_string(length);
+  }
+  xname += "]";
+  ConstString newname(xname);
+
+  if (RustType *cached = FindCachedType(newname))
     return CompilerType(this, cached);
-  RustType *type = new RustArray(name, length, element_type);
-  m_types[name].reset(type);
+  RustType *type = new RustArray(newname, length, element_type);
+  m_types[newname].reset(type);
   return CompilerType(this, type);
 }
 

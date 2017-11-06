@@ -22,6 +22,8 @@ fn main() {
     let vf32: f32 = 5.25;
     let vf64: f64 = 7.5;
 
+    let vi8array : [i8; 4] = [1,2,3,4];
+
     let empty = ();
 
     do_nothing();               // breakpoint

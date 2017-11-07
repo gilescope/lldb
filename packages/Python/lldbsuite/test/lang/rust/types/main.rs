@@ -11,6 +11,11 @@ pub struct Struct {
 
 struct TupleStruct(u8, char);
 
+pub union Union {
+    field1: u8,
+    field2: char,
+}
+
 fn main() {
     let vbool: bool = true;
 
@@ -37,7 +42,8 @@ fn main() {
 
     let vstruct = Struct { field1: 23, field2: 'Q' };
     let vtuplestruct = TupleStruct(23, 'Q');
-    let tuple = (23u8, 'Q');
+    let vtuple = (23u8, 'Q');
+    let vunion = Union { field2: 'Q' };
 
     do_nothing();               // breakpoint
 }

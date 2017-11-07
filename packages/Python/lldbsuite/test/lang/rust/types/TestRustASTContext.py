@@ -129,10 +129,12 @@ class TestRustASTContext(TestBase):
                  'struct Struct { field1: u8, field2: char }'),
                 ('vtuplestruct', 'TupleStruct', None, None,
                  'struct TupleStruct ( u8, char )'),
-                ('tuple', '(u8, char)', None, None,
+                ('vtuple', '(u8, char)', None, None,
                  # The spaces occur here because we emit newlines and
                  # then those are turned to spaces by the join() below.
                  '( u8, char )'),
+                ('vunion', 'Union', 'field1', 'field2',
+                 'union Union { field1: u8, field2: char }'),
         ]:
             v = self.var(vname)
             vtype = v.GetType()

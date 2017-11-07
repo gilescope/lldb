@@ -431,7 +431,6 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   // zero-length tuple struct.
   bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
   bool numeric_names = true;
-  unsigned offset = 0;
 
   ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
@@ -471,7 +470,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
       if (numeric_names) {
 	char buf[32];
-	snprintf (buf, sizeof (buf), "__%d", offset);
+	snprintf (buf, sizeof (buf), "__%lu", (unsigned long) fields.size());
 	if (!new_field.name || strcmp(new_field.name, buf) != 0)
 	  numeric_names = false;
       }
@@ -513,7 +512,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   for (auto &&field : fields) {
     Type *type = die.ResolveTypeUID(DIERef(field.type));
     if (type) {
-      ConstString name(field.name);
+      ConstString name(is_tuple ? "" : field.name);
       CompilerType member_type = type->GetFullCompilerType();
       m_ast.AddFieldToStruct(compiler_type, name, member_type, field.byte_offset);
     }

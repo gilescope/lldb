@@ -4,6 +4,13 @@
 
 fn do_nothing() { }
 
+pub struct Struct {
+    field1: u8,
+    field2: char,
+}
+
+struct TupleStruct(u8, char);
+
 fn main() {
     let vbool: bool = true;
 
@@ -27,6 +34,10 @@ fn main() {
     let vi8array : [i8; 4] = [1,2,3,4];
 
     let empty = ();
+
+    let vstruct = Struct { field1: 23, field2: 'Q' };
+    let vtuplestruct = TupleStruct(23, 'Q');
+    let tuple = (23u8, 'Q');
 
     do_nothing();               // breakpoint
 }

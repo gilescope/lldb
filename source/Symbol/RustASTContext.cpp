@@ -73,7 +73,6 @@ public:
   virtual RustFunction *AsFunction() { return nullptr; }
   virtual RustIntegral *AsInteger () { return nullptr; }
   virtual RustPointer *AsPointer () { return nullptr; }
-  virtual RustStruct *AsStruct() { return nullptr; }
   virtual RustTuple *AsTuple() { return nullptr; }
   virtual RustTypedef *AsTypedef() { return nullptr; }
 
@@ -306,6 +305,22 @@ public:
     return &m_fields[idx];
   }
 
+  typedef std::vector<Field>::const_iterator const_iterator;
+
+  const_iterator begin() const {
+    return m_fields.begin();
+  }
+
+  const_iterator end() const {
+    return m_fields.end();
+  }
+
+  // Type-printing support.
+  virtual const char *Tag() const = 0;
+  virtual const char *TagName() const = 0;
+  virtual const char *Opener() const = 0;
+  virtual const char *Closer() const = 0;
+
 private:
 
   uint64_t m_byte_size;
@@ -326,6 +341,32 @@ public:
   void AddField(const CompilerType &type, uint64_t offset) {
     RustAggregateBase::AddField(ConstString(), type, offset);
   }
+
+  const char *Tag() const override {
+    return IsTuple() ? "" : "struct ";
+  }
+  const char *TagName() const override {
+    if (IsTuple()) {
+      return "";
+    }
+    return Name().AsCString();
+  }
+  const char *Opener() const override {
+    return "(";
+  }
+  const char *Closer() const override {
+    return ")";
+  }
+
+private:
+
+  // As opposed to a tuple struct.
+  bool IsTuple() const {
+    ConstString name = Name();
+    // For the time being we must examine the name, because the DWARF
+    // doesn't provide anything else.
+    return name.IsEmpty() || name.AsCString()[0] == '(';
+  }
 };
 
 class RustStruct : public RustAggregateBase {
@@ -336,7 +377,18 @@ public:
 
   NO_COPY(RustStruct);
 
-  RustStruct *AsStruct() override { return this; }
+  const char *Tag() const override {
+    return "struct ";
+  }
+  const char *TagName() const override {
+    return Name().AsCString();
+  }
+  const char *Opener() const override {
+    return "{";
+  }
+  const char *Closer() const override {
+    return "}";
+  }
 };
 
 class RustUnion : public RustAggregateBase {
@@ -346,6 +398,20 @@ public:
   {}
 
   NO_COPY(RustUnion);
+
+
+  const char *Tag() const override {
+    return "union ";
+  }
+  const char *TagName() const override {
+    return Name().AsCString();
+  }
+  const char *Opener() const override {
+    return "{";
+  }
+  const char *Closer() const override {
+    return "}";
+  }
 };
 
 class RustFunction : public RustType {
@@ -696,7 +762,7 @@ bool RustASTContext::IsVoidType(lldb::opaque_compiler_type_t type) {
   if (!type)
     return false;
   RustTuple *tuple = static_cast<RustType *>(type)->AsTuple();
-  return tuple && tuple->Name().AsCString() &&
+  return tuple && !tuple->Name().IsEmpty() &&
     strcmp(tuple->Name().AsCString(), "()") == 0 && tuple->FieldCount() == 0;
 }
 
@@ -1342,25 +1408,38 @@ void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type, Stre
   ConstString name = GetTypeName(type);
   RustType *t = static_cast<RustType *>(type);
 
-  if (RustAggregateBase *agg = t->AsStruct()) {
-    if (NULL == strchr(name.AsCString(), '{'))
-      s->Printf("type %s ", name.AsCString());
-    s->PutCString("struct {");
+  if (RustAggregateBase *agg = t->AsAggregate()) {
+    s->PutCString(agg->Tag());
+    const char *name = agg->TagName();
+    s->PutCString(name);
+    if (*name) {
+      s->PutCString(" ");
+    }
+    s->PutCString(agg->Opener());
     if (agg->FieldCount() == 0) {
-      s->PutChar('}');
+      s->PutCString(agg->Closer());
       return;
     }
     s->IndentMore();
-    uint32_t field_idx = 0;
-    for (auto *field = agg->FieldAt(field_idx); field != nullptr; field_idx++) {
+    // A trailing comma looks weird for tuples, so we keep track and
+    // don't emit it.
+    bool first = true;
+    for (auto &&field : *agg) {
+      if (!first) {
+	s->PutChar(',');
+      }
+      first = false;
       s->PutChar('\n');
       s->Indent();
-      s->Printf("%s %s", field->m_name.AsCString(),
-		field->m_type.GetTypeName().AsCString());
+      if (!field.m_name.IsEmpty()) {
+	s->PutCString(field.m_name.AsCString());
+	s->PutCString(": ");
+      }
+      s->PutCString(field.m_type.GetTypeName().AsCString());
     }
     s->IndentLess();
     s->PutChar('\n');
-    s->Indent("}");
+    s->Indent(agg->Closer());
     return;
   }
 
@@ -1463,8 +1542,8 @@ void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
   if (!ast)
     return;
   RustType *type = static_cast<RustType *>(struct_type.GetOpaqueQualType());
-  if (RustStruct *s = type->AsStruct())
-    s->AddField(name, field_type, byte_offset);
+  if (RustAggregateBase *a = type->AsAggregate())
+    a->AddField(name, field_type, byte_offset);
 }
 
 CompilerType

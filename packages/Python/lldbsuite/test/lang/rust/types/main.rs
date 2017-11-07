@@ -7,6 +7,8 @@ fn do_nothing() { }
 fn main() {
     let vbool: bool = true;
 
+    let vchar: char = 'Q';
+
     let vi8: i8 = -23;
     let vu8: u8 = 23;
     let vi16: i16 = -2323;

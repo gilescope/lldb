@@ -66,7 +66,7 @@ public:
   }
 
 private:
-  lldb::TypeSP ParseSimpleType(const DWARFDIE &die);
+  lldb::TypeSP ParseSimpleType(lldb_private::Log *log, const DWARFDIE &die);
   lldb::TypeSP ParseArrayType(const DWARFDIE &die);
   lldb::TypeSP ParseFunctionType(const DWARFDIE &die);
   lldb::TypeSP ParseStructureType(const DWARFDIE &die);

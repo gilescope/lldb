@@ -183,7 +183,7 @@ private:
   DWARFDIE m_die;
 };
 
-TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
+TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDIE &die) {
   lldb::user_id_t encoding_uid = LLDB_INVALID_UID;
   const char *type_name_cstr = NULL;
   ConstString type_name_const_str;
@@ -225,10 +225,16 @@ TypeSP DWARFASTParserRust::ParseSimpleType(const DWARFDIE &die) {
       compiler_type = m_ast.CreateBoolType(type_name_const_str);
     else if (encoding == DW_ATE_float)
       compiler_type = m_ast.CreateFloatType(type_name_const_str, byte_size);
-    else if (encoding == DW_ATE_signed || encoding == DW_ATE_unsigned)
+    else if (encoding == DW_ATE_signed || encoding == DW_ATE_unsigned ||
+	     encoding == DW_ATE_unsigned_char)
       compiler_type = m_ast.CreateIntegralType(type_name_const_str,
 					       encoding == DW_ATE_signed,
 					       byte_size);
+    else
+      dwarf->GetObjectFile()->GetModule()->LogMessage(
+          log, "DWARFASTParserRust::ParseSimpleType (die = 0x%8.8x) %s "
+               "unrecognized encoding '%d')",
+          die.GetOffset(), DW_TAG_value_to_name(die.Tag()), int(encoding));
     break;
 
     // Note that, currently, rustc does not emit DW_TAG_reference_type
@@ -571,7 +577,7 @@ TypeSP DWARFASTParserRust::ParseTypeFromDWARF(
       case DW_TAG_typedef:
       case DW_TAG_template_type_parameter:
       case DW_TAG_unspecified_type:
-	type_sp = ParseSimpleType(die);
+	type_sp = ParseSimpleType(log, die);
 	break;
 
       case DW_TAG_union_type:

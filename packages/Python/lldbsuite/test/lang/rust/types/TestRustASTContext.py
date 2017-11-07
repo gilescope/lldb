@@ -64,6 +64,9 @@ class TestRustASTContext(TestBase):
         self._typelist = []
         for (name, size, value) in [
             ('bool', 1, 'true'),
+            # FIXME - should be "'q'", not '81' here; but that hasn't
+            # been implemented yet.
+            ('char', 4, '81'),
             ('i8', 1, '-23'),
             ('u8', 1, '23'),
             ('i16', 2, '-2323'),

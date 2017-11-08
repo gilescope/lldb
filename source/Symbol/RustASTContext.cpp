@@ -974,6 +974,8 @@ uint32_t RustASTContext::GetNumChildren(lldb::opaque_compiler_type_t type,
     result = array->Length();
   } else if (RustTypedef *typ = t->AsTypedef()) {
     result = typ->UnderlyingType().GetNumChildren(omit_empty_base_classes);
+  } else if (RustAggregateBase *agg = t->AsAggregate()) {
+    result = agg->FieldCount();
   }
 
   return result;
@@ -1169,54 +1171,51 @@ void RustASTContext::DumpValue(lldb::opaque_compiler_type_t type,
   RustType *t = static_cast<RustType *>(type);
 
   if (RustAggregateBase *agg = t->AsAggregate()) {
-    if (GetCompleteType(type)) {
-      uint32_t field_idx = 0;
-      for (auto *field = agg->FieldAt(field_idx); field != nullptr; field_idx++) {
-        // Print the starting squiggly bracket (if this is the
-        // first member) or comma (for member 2 and beyond) for
-        // the struct/union/class member.
-        if (field_idx == 0)
-          s->PutChar('{');
-        else
-          s->PutChar(',');
+    uint32_t field_idx = 0;
+    for (auto *field = agg->FieldAt(field_idx); field != nullptr; field_idx++) {
+      // Print the starting squiggly bracket (if this is the
+      // first member) or comma (for member 2 and beyond) for
+      // the struct/union/class member.
+      if (field_idx == 0)
+	s->PutCString(agg->Opener());
+      else
+	s->PutChar(',');
 
-        // Indent
-        s->Printf("\n%*s", depth + DEPTH_INCREMENT, "");
+      // Indent
+      s->Printf("\n%*s", depth + DEPTH_INCREMENT, "");
 
-        // Print the member type if requested
-        if (show_types) {
-          ConstString field_type_name = field->m_type.GetTypeName();
-          s->Printf("(%s) ", field_type_name.AsCString());
-        }
-        // Print the member name and equal sign
-        s->Printf("%s = ", field->m_name.AsCString());
-
-        // Dump the value of the member
-        CompilerType field_type = field->m_type;
-        field_type.DumpValue(
-            exe_ctx,
-            s, // Stream to dump to
-            field_type.GetFormat(), // The format with which to display the member
-            data,             // Data buffer containing all bytes for this type
-            data_byte_offset + field->m_offset, // Offset
-            field->m_type.GetByteSize(
-                exe_ctx->GetBestExecutionContextScope()), // Size of this type
-                                                          // in bytes
-            0,                                            // Bitfield bit size
-            0,                                            // Bitfield bit offset
-            show_types,   // Boolean indicating if we should show the variable
-                          // types
-            show_summary, // Boolean indicating if we should show a summary for
-                          // the current type
-            verbose,      // Verbose output?
-            depth + DEPTH_INCREMENT); // Scope depth for any types that have
-                                      // children
+      // Print the member type if requested
+      if (show_types) {
+	ConstString field_type_name = field->m_type.GetTypeName();
+	s->Printf("(%s) ", field_type_name.AsCString());
       }
+      // Print the member name and equal sign
+      s->Printf("%s = ", field->m_name.AsCString());
 
-      // Indent the trailing squiggly bracket
-      if (field_idx > 0)
-        s->Printf("\n%*s}", depth, "");
+      // Dump the value of the member
+      CompilerType field_type = field->m_type;
+      field_type.DumpValue(
+			   exe_ctx,
+			   s, // Stream to dump to
+			   field_type.GetFormat(), // The format with which to display the member
+			   data,             // Data buffer containing all bytes for this type
+			   data_byte_offset + field->m_offset, // Offset
+			   // Size of this type in bytes
+			   field->m_type.GetByteSize(exe_ctx->GetBestExecutionContextScope()),
+			   0,                                            // Bitfield bit size
+			   0,                                            // Bitfield bit offset
+			   show_types,   // Boolean indicating if we should show the variable
+			   // types
+			   show_summary, // Boolean indicating if we should show a summary for
+			   // the current type
+			   verbose,      // Verbose output?
+			   depth + DEPTH_INCREMENT); // Scope depth for any types that have
+      // children
     }
+
+    // Indent the trailing squiggly bracket
+    if (field_idx > 0)
+      s->Printf("\n%*s%s", depth, "", agg->Closer());
   }
 
   if (RustArray *a = t->AsArray()) {

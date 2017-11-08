@@ -323,7 +323,6 @@ private:
 
 class RustTuple : public RustAggregateBase {
 public:
-  // FIXME differentiate tuple struct?
   RustTuple(const ConstString &name, uint64_t byte_size)
     : RustAggregateBase(name, byte_size)
   {}

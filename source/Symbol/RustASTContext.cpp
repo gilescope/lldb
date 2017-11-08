@@ -118,6 +118,8 @@ public:
   NO_COPY(RustIntegral);
 
   lldb::Format Format() const override {
+    if (m_is_char)
+      return eFormatUnicode32;
     return m_is_signed ? eFormatDecimal : eFormatUnsigned;
   }
 

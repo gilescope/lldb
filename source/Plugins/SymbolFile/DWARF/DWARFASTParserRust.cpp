@@ -238,20 +238,23 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
     break;
 
     // Note that, currently, rustc does not emit DW_TAG_reference_type
-    // - references are distinguished by name.
+    // - references are distinguished by name; and also we don't want
+    // to treat Rust references as CompilerType references.
   case DW_TAG_pointer_type:
-    m_ast.SetAddressByteSize(die.GetCU()->GetAddressByteSize());
-    encoding_data_type = Type::eEncodingIsPointerUID;
-    break;
-
   case DW_TAG_typedef:
   case DW_TAG_template_type_parameter: {
-    encoding_data_type = Type::eEncodingIsTypedefUID;
-    CompilerType impl;
     Type *type = dwarf->ResolveTypeUID(encoding_uid);
     if (type) {
-      impl = type->GetForwardCompilerType();
-      compiler_type = m_ast.CreateTypedefType(type_name_const_str, impl);
+      CompilerType impl = type->GetForwardCompilerType();
+      if (die.Tag() == DW_TAG_pointer_type) {
+	int byte_size = die.GetCU()->GetAddressByteSize();
+	m_ast.SetAddressByteSize(byte_size);
+	compiler_type = m_ast.CreatePointerType(type_name_const_str, impl, byte_size);
+	encoding_data_type = Type::eEncodingIsPointerUID;
+      } else {
+	compiler_type = m_ast.CreateTypedefType(type_name_const_str, impl);
+	encoding_data_type = Type::eEncodingIsTypedefUID;
+      }
     }
     break;
   }

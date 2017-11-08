@@ -178,20 +178,16 @@ private:
 class RustPointer : public RustType {
 public:
   // Pointers and references are handled similarly.
-  RustPointer(const ConstString &name, const CompilerType &pointee, uint64_t byte_size,
-	      bool is_reference)
+  RustPointer(const ConstString &name, const CompilerType &pointee, uint64_t byte_size)
     : RustType(name),
       m_pointee(pointee),
-      m_byte_size(byte_size),
-      m_is_reference(is_reference)
+      m_byte_size(byte_size)
   {}
   NO_COPY(RustPointer);
 
   lldb::Format Format() const override {
     return eFormatPointer;
   }
-
-  bool IsReference() const { return m_is_reference; }
 
   CompilerType PointeeType() const { return m_pointee; }
 
@@ -200,8 +196,7 @@ public:
   uint32_t TypeInfo(CompilerType *elem) const override {
     if (elem)
       *elem = m_pointee;
-    return (eTypeIsBuiltIn | eTypeHasValue
-	    | (m_is_reference ? eTypeIsReference : eTypeIsPointer));
+    return eTypeIsBuiltIn | eTypeHasValue | eTypeIsPointer;
   }
 
   lldb::TypeClass TypeClass() const override {
@@ -216,7 +211,6 @@ private:
 
   CompilerType m_pointee;
   uint64_t m_byte_size;
-  bool m_is_reference;
 };
 
 class RustArray : public RustType {
@@ -711,8 +705,7 @@ bool RustASTContext::IsPointerType(lldb::opaque_compiler_type_t type,
 				   CompilerType *pointee_type) {
   if (!type)
     return false;
-  RustPointer *ptr = static_cast<RustType *>(type)->AsPointer();
-  if (ptr && !ptr->IsReference()) {
+  if (RustPointer *ptr = static_cast<RustType *>(type)->AsPointer()) {
     if (pointee_type)
       *pointee_type = ptr->PointeeType();
     return true;
@@ -722,29 +715,12 @@ bool RustASTContext::IsPointerType(lldb::opaque_compiler_type_t type,
 
 bool RustASTContext::IsPointerOrReferenceType(lldb::opaque_compiler_type_t type,
 					      CompilerType *pointee_type) {
-  if (!type)
-    return false;
-  RustPointer *ptr = static_cast<RustType *>(type)->AsPointer();
-  if (ptr) {
-    if (pointee_type)
-      *pointee_type = ptr->PointeeType();
-    return true;
-  }
-  return false;
   return IsPointerType(type, pointee_type);
 }
 
 bool RustASTContext::IsReferenceType(lldb::opaque_compiler_type_t type,
 				     CompilerType *pointee_type,
 				     bool *is_rvalue) {
-  if (!type)
-    return false;
-  RustPointer *ptr = static_cast<RustType *>(type)->AsPointer();
-  if (ptr && ptr->IsReference()) {
-    if (pointee_type)
-      *pointee_type = ptr->PointeeType();
-    return true;
-  }
   return false;
 }
 
@@ -912,16 +888,10 @@ CompilerType RustASTContext::GetPointeeType(lldb::opaque_compiler_type_t type) {
 }
 
 CompilerType RustASTContext::GetPointerType(lldb::opaque_compiler_type_t type) {
-  if (!type)
-    return CompilerType();
   ConstString type_name = GetTypeName(type);
-  ConstString pointer_name(std::string("*") + type_name.GetCString());
-  if (RustType *cached = FindCachedType(pointer_name))
-    return CompilerType(this, cached);
-  RustType *pointer = new RustPointer(pointer_name, CompilerType(this, type),
-				      m_pointer_byte_size, false);
-  m_types[pointer_name].reset(pointer);
-  return CompilerType(this, pointer);
+  // Arbitrarily look for a raw pointer here.
+  ConstString pointer_name(std::string("*mut ") + type_name.GetCString());
+  return CreatePointerType(pointer_name, CompilerType(this, type), m_pointer_byte_size);
 }
 
 // If the current object represents a typedef type, get the underlying type
@@ -1527,6 +1497,17 @@ RustASTContext::CreateUnionType(const lldb_private::ConstString &name, uint32_t 
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustUnion(name, byte_size);
+  m_types[name].reset(type);
+  return CompilerType(this, type);
+}
+
+CompilerType
+RustASTContext::CreatePointerType(const lldb_private::ConstString &name,
+				  const CompilerType &pointee_type,
+				  uint32_t byte_size) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
+  RustType *type = new RustPointer(name, pointee_type, byte_size);
   m_types[name].reset(type);
   return CompilerType(this, type);
 }

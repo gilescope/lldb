@@ -109,6 +109,11 @@ class TestRustASTContext(TestBase):
         # this type by name; but also not eTypeClassBuiltin.
         # FIXME the value here as well
         mytypelist.append(('[i8; 4]', 'vi8array', 4, None))
+        address_size = self.target().GetAddressByteSize()
+        mytypelist.append(('*const bool', 'vboolpointer', address_size, None))
+        mytypelist.append(('*mut char', 'vcharpointer', address_size, None))
+        mytypelist.append(('&i8', 'vi8ref', address_size, None))
+        mytypelist.append(('&mut u8', 'vu8ref', address_size, None))
 
         for (name, vname, size, value) in mytypelist:
             v = self.var(vname)

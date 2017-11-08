@@ -104,6 +104,9 @@ public:
 				  bool is_signed, uint64_t byte_size);
   CompilerType CreateFloatType(const lldb_private::ConstString &name,
 			       uint64_t byte_size);
+  CompilerType CreatePointerType(const lldb_private::ConstString &name,
+				 const CompilerType &pointee_type,
+				 uint32_t byte_size);
 
   CompilerType CreateArrayType(const CompilerType &element_type,
                                uint64_t length);

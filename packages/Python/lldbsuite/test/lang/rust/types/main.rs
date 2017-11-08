@@ -19,10 +19,10 @@ pub union Union {
 fn main() {
     let vbool: bool = true;
 
-    let vchar: char = 'Q';
+    let mut vchar: char = 'Q';
 
     let vi8: i8 = -23;
-    let vu8: u8 = 23;
+    let mut vu8: u8 = 23;
     let vi16: i16 = -2323;
     let vu16: u16 = 2323;
     let vi32: i32 = -232323;
@@ -44,6 +44,11 @@ fn main() {
     let vtuplestruct = TupleStruct(23, 'Q');
     let vtuple = (23u8, 'Q');
     let vunion = Union { field2: 'Q' };
+
+    let vboolpointer = &vbool as *const bool;
+    let vcharpointer = &mut vchar as *mut char;
+    let vi8ref = &vi8;
+    let vu8ref = &mut vu8;
 
     do_nothing();               // breakpoint
 }

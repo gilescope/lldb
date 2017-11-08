@@ -1307,7 +1307,7 @@ bool RustASTContext::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
     case eFormatBoolean:
     case eFormatBinary:
     case eFormatComplex:
-    case eFormatCString: // NULL terminated C strings
+    case eFormatCString:
     case eFormatDecimal:
     case eFormatEnum:
     case eFormatHex:

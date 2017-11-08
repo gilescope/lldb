@@ -129,23 +129,19 @@ class TestRustASTContext(TestBase):
         self.assertEqual(fn_type.GetFunctionReturnType().name, '()')
 
     def check_structs(self):
-        for (vname, typename, m0name, m1name, xdesc) in [
+        for (vname, typename, m0name, m1name, desc) in [
                 ('vstruct', 'Struct', 'field1', 'field2',
-                 'struct Struct { field1: u8, field2: char }'),
+                 'struct Struct {\n  field1: u8,\n  field2: char\n}'),
                 ('vtuplestruct', 'TupleStruct', None, None,
-                 'struct TupleStruct ( u8, char )'),
+                 'struct TupleStruct (\n  u8,\n  char\n)'),
                 ('vtuple', '(u8, char)', None, None,
-                 # The spaces occur here because we emit newlines and
-                 # then those are turned to spaces by the join() below.
-                 '( u8, char )'),
+                 '(\n  u8,\n  char\n)'),
                 ('vunion', 'Union', 'field1', 'field2',
-                 'union Union { field1: u8, field2: char }'),
+                 'union Union {\n  field1: u8,\n  field2: char\n}'),
         ]:
             v = self.var(vname)
             vtype = v.GetType()
-            # Get the description but filter out the whitespace.
-            desc = ' '.join(str(vtype).split())
-            self.assertEqual(desc, xdesc)
+            self.assertEqual(str(vtype), desc)
             self.assertEqual(typename, vtype.name)
             self.assertTrue(vtype.IsTypeComplete())
             self.assertEqual(vtype.GetNumberOfFields(), 2)

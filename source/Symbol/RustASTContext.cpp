@@ -1362,7 +1362,7 @@ void RustASTContext::DumpSummary(lldb::opaque_compiler_type_t type,
 				 const DataExtractor &data,
 				 lldb::offset_t data_offset,
 				 size_t data_byte_size) {
-  // FIXME
+  // Apparently there is nothing to do here.
 }
 
 void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type) {

@@ -104,7 +104,7 @@ class TestRustASTContext(TestBase):
         mytypelist = self._typelist[:]
         # FIXME value should not be None here
         # Not in _typelist because it isn't eTypeClassBuiltin.
-        self._typelist.append(('()', 'empty', 0, None))
+        mytypelist.append(('()', 'empty', 0, None))
         # FIXME Not in _typelist because we can't currently look up
         # this type by name; but also not eTypeClassBuiltin.
         # FIXME the value here as well

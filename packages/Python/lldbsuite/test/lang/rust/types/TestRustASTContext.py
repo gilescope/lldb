@@ -64,22 +64,22 @@ class TestRustASTContext(TestBase):
         address_size = self.target().GetAddressByteSize()
         self._typelist = []
         for (name, size, value) in [
-            ('bool', 1, 'true'),
-            # FIXME - should be "'q'", not '81' here; but that hasn't
-            # been implemented yet.
-            ('char', 4, '81'),
-            ('i8', 1, '-23'),
-            ('u8', 1, '23'),
-            ('i16', 2, '-2323'),
-            ('u16', 2, '2323'),
-            ('i32', 4, '-232323'),
-            ('u32', 4, '232323'),
-            ('i64', 8, '-23232323'),
-            ('u64', 8, '23232323'),
-            ('isize', address_size, '-23232323'),
-            ('usize', address_size, '23232323'),
-            ('f32', 4, '5.25'),
-            ('f64', 8, '7.5'),
+                ('bool', 1, 'true'),
+                # FIXME - should be "'q'", not '81' here; but that hasn't
+                # been implemented yet.
+                ('char', 4, '81'),
+                ('i8', 1, '-23'),
+                ('u8', 1, '23'),
+                ('i16', 2, '-2323'),
+                ('u16', 2, '2323'),
+                ('i32', 4, '-232323'),
+                ('u32', 4, '232323'),
+                ('i64', 8, '-23232323'),
+                ('u64', 8, '23232323'),
+                ('isize', address_size, '-23232323'),
+                ('usize', address_size, '23232323'),
+                ('f32', 4, '5.25'),
+                ('f64', 8, '7.5'),
         ]:
             self._typelist.append((name, 'v' + name, size, value))
 

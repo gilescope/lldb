@@ -130,7 +130,7 @@ public:
 
   uint32_t TypeInfo(CompilerType *) const override {
     uint32_t result = eTypeIsBuiltIn | eTypeHasValue | eTypeIsScalar | eTypeIsInteger;
-    if (m_is_char)
+    if (m_is_signed)
       result |= eTypeIsSigned;
     return result;
   }

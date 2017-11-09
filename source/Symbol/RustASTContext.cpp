@@ -1173,9 +1173,9 @@ void RustASTContext::DumpValue(lldb::opaque_compiler_type_t type,
   if (RustAggregateBase *agg = t->AsAggregate()) {
     uint32_t field_idx = 0;
     for (auto *field = agg->FieldAt(field_idx); field != nullptr; field_idx++) {
-      // Print the starting squiggly bracket (if this is the
-      // first member) or comma (for member 2 and beyond) for
-      // the struct/union/class member.
+      // Print the starting bracket (if this is the first member) or
+      // comma (for member 2 and beyond) for the struct/union/class
+      // member.
       if (field_idx == 0)
 	s->PutCString(agg->Opener());
       else
@@ -1213,7 +1213,7 @@ void RustASTContext::DumpValue(lldb::opaque_compiler_type_t type,
       // children
     }
 
-    // Indent the trailing squiggly bracket
+    // Indent the trailing bracket.
     if (field_idx > 0)
       s->Printf("\n%*s%s", depth, "", agg->Closer());
   }

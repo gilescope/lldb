@@ -35,10 +35,6 @@ using namespace lldb;
 
 namespace lldb_private {
 
-#define NO_COPY(Name) \
-  Name(const Name &) = delete; \
-  Name &operator=(const Name &) = delete
-
 class RustAggregateBase;
 class RustArray;
 class RustFunction;
@@ -52,7 +48,7 @@ class RustType {
 protected:
 
   RustType(const ConstString &name) : m_name(name) {}
-  NO_COPY (RustType);
+  DISALLOW_COPY_AND_ASSIGN (RustType);
 
 public:
 
@@ -87,7 +83,7 @@ private:
 class RustBool : public RustType {
 public:
   RustBool(const ConstString &name) : RustType(name) {}
-  NO_COPY(RustBool);
+  DISALLOW_COPY_AND_ASSIGN(RustBool);
 
   lldb::Format Format() const override {
     return eFormatBoolean;
@@ -115,7 +111,7 @@ public:
       m_byte_size(byte_size),
       m_is_char(is_char)
   {}
-  NO_COPY(RustIntegral);
+  DISALLOW_COPY_AND_ASSIGN(RustIntegral);
 
   lldb::Format Format() const override {
     if (m_is_char)
@@ -154,7 +150,7 @@ public:
     : RustType(name),
       m_byte_size(byte_size)
   {}
-  NO_COPY(RustFloat);
+  DISALLOW_COPY_AND_ASSIGN(RustFloat);
 
   lldb::Format Format() const override {
     return eFormatFloat;
@@ -185,7 +181,7 @@ public:
       m_pointee(pointee),
       m_byte_size(byte_size)
   {}
-  NO_COPY(RustPointer);
+  DISALLOW_COPY_AND_ASSIGN(RustPointer);
 
   lldb::Format Format() const override {
     return eFormatPointer;
@@ -222,7 +218,7 @@ public:
       m_length(length),
       m_elem(elem)
   {}
-  NO_COPY(RustArray);
+  DISALLOW_COPY_AND_ASSIGN(RustArray);
 
   uint64_t Length() const { return m_length; }
   RustArray *AsArray() override { return this; }
@@ -256,7 +252,7 @@ protected:
       m_byte_size(byte_size)
   {}
 
-  NO_COPY(RustAggregateBase);
+  DISALLOW_COPY_AND_ASSIGN(RustAggregateBase);
 
 public:
 
@@ -329,7 +325,7 @@ public:
     : RustAggregateBase(name, byte_size)
   {}
 
-  NO_COPY(RustTuple);
+  DISALLOW_COPY_AND_ASSIGN(RustTuple);
 
   RustTuple *AsTuple() override { return this; }
 
@@ -370,7 +366,7 @@ public:
     : RustAggregateBase(name, byte_size)
   {}
 
-  NO_COPY(RustStruct);
+  DISALLOW_COPY_AND_ASSIGN(RustStruct);
 
   const char *Tag() const override {
     return "struct ";
@@ -392,7 +388,7 @@ public:
     : RustAggregateBase(name, byte_size)
   {}
 
-  NO_COPY(RustUnion);
+  DISALLOW_COPY_AND_ASSIGN(RustUnion);
 
 
   const char *Tag() const override {
@@ -420,7 +416,7 @@ public:
       m_arguments(std::move(arguments))
   {
   }
-  NO_COPY(RustFunction);
+  DISALLOW_COPY_AND_ASSIGN(RustFunction);
 
   // do we care about the names?
   void AddArgument(const CompilerType &type) {
@@ -461,7 +457,7 @@ public:
   {
   }
 
-  NO_COPY(RustTypedef);
+  DISALLOW_COPY_AND_ASSIGN(RustTypedef);
 
   RustTypedef *AsTypedef() override { return this; }
   CompilerType UnderlyingType() const { return m_type; }

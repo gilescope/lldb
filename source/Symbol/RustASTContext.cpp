@@ -1226,11 +1226,8 @@ void RustASTContext::DumpValue(lldb::opaque_compiler_type_t type,
 
     uint64_t element_idx;
     for (element_idx = 0; element_idx < a->Length(); ++element_idx) {
-      // Print the starting squiggly bracket (if this is the
-      // first member) or comman (for member 2 and beyong) for
-      // the struct/union/class member.
       if (element_idx == 0)
-        s->PutChar('{');
+        s->PutChar('[');
       else
         s->PutChar(',');
 
@@ -1260,9 +1257,9 @@ void RustASTContext::DumpValue(lldb::opaque_compiler_type_t type,
               DEPTH_INCREMENT); // Scope depth for any types that have children
     }
 
-    // Indent the trailing squiggly bracket
+    // Indent the trailing bracket
     if (element_idx > 0)
-      s->Printf("\n%*s}", depth, "");
+      s->Printf("\n%*s]", depth, "");
   }
 
   if (show_summary)

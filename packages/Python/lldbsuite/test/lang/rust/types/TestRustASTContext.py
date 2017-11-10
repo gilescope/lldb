@@ -107,8 +107,9 @@ class TestRustASTContext(TestBase):
         mytypelist.append(('()', 'empty', 0, None))
         # FIXME Not in _typelist because we can't currently look up
         # this type by name; but also not eTypeClassBuiltin.
-        # FIXME the value here as well
-        mytypelist.append(('[i8; 4]', 'vi8array', 4, None))
+        # FIXME there doesn't seem to be a way to customize the array
+        # formatting to be more rust-like.
+        mytypelist.append(('[i8; 4]', 'vi8array', 4, '([0] = 1, [1] = 2, [2] = 3, [3] = 4)'))
         address_size = self.target().GetAddressByteSize()
         mytypelist.append(('*const bool', 'vboolpointer', address_size, None))
         mytypelist.append(('*mut char', 'vcharpointer', address_size, None))
@@ -118,9 +119,10 @@ class TestRustASTContext(TestBase):
         for (name, vname, size, value) in mytypelist:
             v = self.var(vname)
             self.assertEqual(name, v.GetType().name)
-            # FIXME the None check is a temporary hack.
+            # Some values can't really be checked.
             if value is not None:
-                self.assertEqual(value, v.value)
+                expected = "(" + name + ") " + vname + " = " + value
+                self.assertEqual(expected, str(v))
 
     def check_main_function(self):
         fn_type = self.frame().GetFunction().GetType()

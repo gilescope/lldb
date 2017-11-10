@@ -16,6 +16,12 @@ pub union Union {
     field2: char,
 }
 
+pub enum CLikeEnum {
+    MinusOne = -1,
+    Zero,
+    One,
+}
+
 fn main() {
     let vbool: bool = true;
 
@@ -49,6 +55,8 @@ fn main() {
     let vcharpointer = &mut vchar as *mut char;
     let vi8ref = &vi8;
     let vu8ref = &mut vu8;
+
+    let vclikeenum = CLikeEnum::MinusOne;
 
     do_nothing();               // breakpoint
 }

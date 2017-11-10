@@ -70,6 +70,7 @@ private:
   lldb::TypeSP ParseArrayType(const DWARFDIE &die);
   lldb::TypeSP ParseFunctionType(const DWARFDIE &die);
   lldb::TypeSP ParseStructureType(const DWARFDIE &die);
+  lldb::TypeSP ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE &die);
 
   lldb_private::RustASTContext &m_ast;
 };

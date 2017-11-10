@@ -120,6 +120,9 @@ public:
   CompilerType CreateStructType(const ConstString &name, uint32_t byte_size);
   CompilerType CreateTupleType(const ConstString &name, uint32_t byte_size);
   CompilerType CreateUnionType(const ConstString &name, uint32_t byte_size);
+  CompilerType CreateCLikeEnumType(const lldb_private::ConstString &name,
+				   const CompilerType &underlying_type,
+				   std::map<uint64_t, std::string> &&values);
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,

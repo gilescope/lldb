@@ -545,6 +545,69 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   return type_sp;
 }
 
+TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE &die) {
+  const char *type_name_cstr = NULL;
+  ConstString type_name_const_str;
+  SymbolFileDWARF *dwarf = die.GetDWARF();
+  CompilerType underlying_type;
+
+  for (auto &&attr : IterableDIEAttrs(die)) {
+    switch (attr.first) {
+    case DW_AT_name:
+      type_name_cstr = attr.second.AsCString();
+      type_name_const_str.SetCString(type_name_cstr);
+      break;
+
+    case DW_AT_type:
+      if (Type *type = die.ResolveTypeUID(DIERef(attr.second))) {
+	underlying_type = type->GetFullCompilerType();
+      }
+      break;
+    }
+  }
+
+  std::map<uint64_t, std::string> values;
+  for (auto &&child_die : IterableDIEChildren(die)) {
+    if (child_die.Tag() != DW_TAG_enumerator) {
+      continue;
+    }
+
+    bool saw_value = false;
+    uint64_t value;
+    std::string name;
+    for (auto &&attr : IterableDIEAttrs(child_die)) {
+      switch (attr.first) {
+      case DW_AT_name:
+	name = attr.second.AsCString();
+	break;
+      case DW_AT_const_value:
+	saw_value = true;
+	value = attr.second.Unsigned();
+	break;
+      }
+
+      if (saw_value && !name.empty()) {
+	values[value] = name;
+      } else {
+	dwarf->GetObjectFile()->GetModule()->LogMessage(
+          log, "DWARFASTParserRust::ParseCLikeEnum (die = 0x%8.8x) %s "
+               "is invalid)",
+          child_die.GetOffset(), DW_TAG_value_to_name(die.Tag()));
+      }
+    }
+  }
+
+  Declaration decl;
+  CompilerType compiler_type = m_ast.CreateCLikeEnumType(type_name_const_str,
+							 underlying_type,
+							 std::move(values));
+  TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str, 0, NULL,
+			  LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
+			  compiler_type, Type::eResolveStateFull));
+
+  return type_sp;
+}
+
 TypeSP DWARFASTParserRust::ParseTypeFromDWARF(
     const lldb_private::SymbolContext &sc, const DWARFDIE &die,
     lldb_private::Log *log, bool *type_is_new_ptr) {
@@ -596,9 +659,9 @@ TypeSP DWARFASTParserRust::ParseTypeFromDWARF(
 	type_sp = ParseArrayType(die);
 	break;
 
-      // case DW_TAG_enumeration_type:
-      // 	// FIXME
-      // 	break;
+      case DW_TAG_enumeration_type:
+	type_sp = ParseCLikeEnum(log, die);
+	break;
 
       default:
         dwarf->GetObjectFile()->GetModule()->ReportError(

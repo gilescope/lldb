@@ -37,6 +37,7 @@ namespace lldb_private {
 
 class RustAggregateBase;
 class RustArray;
+class RustCLikeEnum;
 class RustFunction;
 class RustIntegral;
 class RustPointer;
@@ -66,6 +67,7 @@ public:
 
   virtual RustAggregateBase *AsAggregate() { return nullptr; }
   virtual RustArray *AsArray () { return nullptr; }
+  virtual RustCLikeEnum *AsCLikeEnum() { return nullptr; }
   virtual RustFunction *AsFunction() { return nullptr; }
   virtual RustIntegral *AsInteger () { return nullptr; }
   virtual RustPointer *AsPointer () { return nullptr; }
@@ -142,6 +144,55 @@ private:
   bool m_is_signed;
   uint64_t m_byte_size;
   bool m_is_char;
+};
+
+class RustCLikeEnum : public RustType {
+public:
+  RustCLikeEnum(const ConstString &name, const CompilerType &underlying_type,
+		std::map<uint64_t, std::string> &&values)
+    : RustType(name),
+      m_underlying_type(underlying_type),
+      m_values(std::move(values))
+  {
+  }
+  DISALLOW_COPY_AND_ASSIGN(RustCLikeEnum);
+
+  RustCLikeEnum *AsCLikeEnum() override { return this; }
+
+  lldb::Format Format() const override {
+    return eFormatEnum;
+  }
+
+  uint32_t TypeInfo(CompilerType *) const override {
+    return eTypeHasValue | eTypeIsEnumeration | eTypeIsScalar;
+  }
+
+  lldb::TypeClass TypeClass() const override {
+    return eTypeClassEnumeration;
+  }
+
+  uint64_t ByteSize() const override {
+    return m_underlying_type.GetByteSize(nullptr);
+  }
+
+  bool IsSigned() const {
+    bool is_signed;
+    return m_underlying_type.IsIntegerType(is_signed) && is_signed;
+  }
+
+  bool FindName(uint64_t val, std::string &name) {
+    auto iter = m_values.find(val);
+    if (iter == m_values.end()) {
+      return false;
+    }
+    name = iter->second;
+    return true;
+  }
+
+private:
+
+  CompilerType m_underlying_type;
+  std::map<uint64_t, std::string> m_values;
 };
 
 class RustFloat : public RustType {
@@ -1195,6 +1246,32 @@ bool RustASTContext::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
           exe_scope);
     }
 
+    if (format == eFormatEnum || format == eFormatDefault) {
+      if (RustCLikeEnum *clike = t->AsCLikeEnum()) {
+	uint64_t value;
+	if (clike->IsSigned()) {
+	  int64_t svalue = data.GetMaxS64Bitfield(&byte_offset, byte_size,
+						  bitfield_bit_size,
+						  bitfield_bit_offset);
+	  value = uint64_t(svalue);
+	} else {
+	  value = data.GetMaxU64Bitfield(&byte_offset, byte_size,
+					 bitfield_bit_size,
+					 bitfield_bit_offset);
+	}
+
+	std::string name;
+	if (clike->FindName(value, name)) {
+	  s->Printf("%s::%s", clike->Name().AsCString(), name.c_str());
+	} else {
+	  // If the value couldn't be found, then something went wrong
+	  // we should inform the user.
+	  s->Printf("(invalid enum value) %" PRIu64, value);
+	}
+	return true;
+      }
+    }
+
     uint32_t item_count = 1;
     // A few formats, we might need to modify our size and count for depending
     // on how we are trying to display the value...
@@ -1439,6 +1516,17 @@ RustASTContext::CreateVoidType() {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustTuple(name, 0);
+  m_types[name].reset(type);
+  return CompilerType(this, type);
+}
+
+CompilerType
+RustASTContext::CreateCLikeEnumType(const lldb_private::ConstString &name,
+				    const CompilerType &underlying_type,
+				    std::map<uint64_t, std::string> &&values) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
+  RustType *type = new RustCLikeEnum(name, underlying_type, std::move(values));
   m_types[name].reset(type);
   return CompilerType(this, type);
 }

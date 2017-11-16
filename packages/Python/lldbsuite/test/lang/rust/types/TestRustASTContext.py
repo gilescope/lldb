@@ -120,6 +120,7 @@ class TestRustASTContext(TestBase):
         for (name, vname, size, value) in mytypelist:
             v = self.var(vname)
             self.assertEqual(name, v.GetType().name)
+            self.assertEqual(size, v.GetType().GetByteSize())
             # Some values can't really be checked.
             if value is not None:
                 expected = "(" + name + ") " + vname + " = " + value

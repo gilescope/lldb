@@ -450,7 +450,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 	switch (attr.first) {
 	case DW_AT_name:
 	  new_field.name = attr.second.AsCString();
-	  if (field_index == 0 && strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
+	  if (fields.size() == 0 && strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
 	    new_field.is_discriminant = true;
 	  break;
 	case DW_AT_type:

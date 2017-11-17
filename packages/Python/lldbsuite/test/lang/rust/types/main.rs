@@ -22,6 +22,11 @@ pub enum CLikeEnum {
     One,
 }
 
+pub enum SimpleEnum {
+    One(u8, u8),
+    Two(u16, u16)
+}
+
 fn main() {
     let vbool: bool = true;
 
@@ -57,6 +62,8 @@ fn main() {
     let vu8ref = &mut vu8;
 
     let vclikeenum = CLikeEnum::MinusOne;
+
+    let vsimpleenum = SimpleEnum::Two(83, 92);
 
     do_nothing();               // breakpoint
 }

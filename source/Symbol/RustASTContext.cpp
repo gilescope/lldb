@@ -298,9 +298,10 @@ private:
 // Base type for struct, tuple, and tuple struct.
 class RustAggregateBase : public RustType {
 protected:
-  RustAggregateBase(const ConstString &name, uint64_t byte_size)
+  RustAggregateBase(const ConstString &name, uint64_t byte_size, bool has_discriminant = false)
     : RustType(name),
-      m_byte_size(byte_size)
+      m_byte_size(byte_size),
+      m_has_discriminant(has_discriminant)
   {}
 
   DISALLOW_COPY_AND_ASSIGN(RustAggregateBase);
@@ -342,6 +343,10 @@ public:
     m_fields.emplace_back(name, type, offset);
   }
 
+  bool HasDiscriminant() const {
+    return m_has_discriminant;
+  }
+
   const Field *FieldAt(size_t idx) {
     if (idx >= m_fields.size())
       return nullptr;
@@ -360,7 +365,11 @@ public:
 
   // Type-printing support.
   virtual const char *Tag() const = 0;
-  virtual const char *TagName() const = 0;
+
+  virtual const char *TagName() const {
+    return Name().AsCString();
+  }
+
   virtual const char *Opener() const = 0;
   virtual const char *Closer() const = 0;
 
@@ -368,12 +377,13 @@ private:
 
   uint64_t m_byte_size;
   std::vector<Field> m_fields;
+  bool m_has_discriminant;
 };
 
 class RustTuple : public RustAggregateBase {
 public:
-  RustTuple(const ConstString &name, uint64_t byte_size)
-    : RustAggregateBase(name, byte_size)
+  RustTuple(const ConstString &name, uint64_t byte_size, bool has_discriminant)
+    : RustAggregateBase(name, byte_size, has_discriminant)
   {}
 
   DISALLOW_COPY_AND_ASSIGN(RustTuple);
@@ -413,17 +423,14 @@ private:
 
 class RustStruct : public RustAggregateBase {
 public:
-  RustStruct(const ConstString &name, uint64_t byte_size)
-    : RustAggregateBase(name, byte_size)
+  RustStruct(const ConstString &name, uint64_t byte_size, bool has_discriminant)
+    : RustAggregateBase(name, byte_size, has_discriminant)
   {}
 
   DISALLOW_COPY_AND_ASSIGN(RustStruct);
 
   const char *Tag() const override {
     return "struct ";
-  }
-  const char *TagName() const override {
-    return Name().AsCString();
   }
   const char *Opener() const override {
     return "{";
@@ -441,12 +448,8 @@ public:
 
   DISALLOW_COPY_AND_ASSIGN(RustUnion);
 
-
   const char *Tag() const override {
     return "union ";
-  }
-  const char *TagName() const override {
-    return Name().AsCString();
   }
   const char *Opener() const override {
     return "{";
@@ -454,6 +457,39 @@ public:
   const char *Closer() const override {
     return "}";
   }
+};
+
+// A Rust enum, not a C-like enum.
+class RustEnum : public RustAggregateBase {
+public:
+  RustEnum(const ConstString &name, uint64_t byte_size, std::vector<unsigned> &&discriminant_path)
+    : RustAggregateBase(name, byte_size),
+      m_discriminant_path(std::move(discriminant_path))
+  {}
+
+  DISALLOW_COPY_AND_ASSIGN(RustEnum);
+
+  const char *Tag() const override {
+    return "enum ";
+  }
+  const char *Opener() const override {
+    return "{";
+  }
+  const char *Closer() const override {
+    return "}";
+  }
+
+private:
+
+  // The discriminant path tells us the indices of the fields to
+  // access in order to find the discriminant value.  The discriminant
+  // may be several fields "deep", so this is a vector.  Note that the
+  // 0th index here tells us which field of this enum to start with
+  // (this can be nonzero in the situation where the first field is
+  // synthetic, i.e., when the "NonZero" optimization is applied).
+  // The resulting discriminant can be used as an index into the
+  // fields to find the true type of the enum instance.
+  std::vector<unsigned> m_discriminant_path;
 };
 
 class RustFunction : public RustType {
@@ -1389,18 +1425,29 @@ void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type, Stre
 }
 
 RustType *RustASTContext::FindCachedType(const lldb_private::ConstString &name) {
+  if (name.IsEmpty())
+    return nullptr;
   auto result = m_types.find(name);
   if (result == m_types.end ())
     return nullptr;
   return result->second.get();
 }
 
+CompilerType RustASTContext::CacheType(const ConstString &name, RustType *new_type) {
+  if (name.IsEmpty()) {
+    // Be sure to keep nameless types alive.
+    m_anon_types.insert(std::unique_ptr<RustType>(new_type));
+  } else {
+    m_types[name].reset(new_type);
+  }
+  return CompilerType(this, new_type);
+}
+
 CompilerType RustASTContext::CreateBoolType(const lldb_private::ConstString &name) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustBool(name);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 CompilerType RustASTContext::CreateIntegralType(const lldb_private::ConstString &name,
@@ -1409,8 +1456,7 @@ CompilerType RustASTContext::CreateIntegralType(const lldb_private::ConstString 
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustIntegral(name, is_signed, byte_size);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 CompilerType RustASTContext::CreateFloatType(const lldb_private::ConstString &name,
@@ -1418,8 +1464,7 @@ CompilerType RustASTContext::CreateFloatType(const lldb_private::ConstString &na
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustFloat(name, byte_size);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 CompilerType RustASTContext::CreateArrayType(const CompilerType &element_type,
@@ -1434,34 +1479,32 @@ CompilerType RustASTContext::CreateArrayType(const CompilerType &element_type,
   if (RustType *cached = FindCachedType(newname))
     return CompilerType(this, cached);
   RustType *type = new RustArray(newname, length, element_type);
-  m_types[newname].reset(type);
-  return CompilerType(this, type);
+  return CacheType(newname, type);
 }
 
 CompilerType RustASTContext::CreateTypedefType(const ConstString &name, CompilerType impl) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustTypedef(name, impl);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 CompilerType
-RustASTContext::CreateStructType(const lldb_private::ConstString &name, uint32_t byte_size) {
+RustASTContext::CreateStructType(const lldb_private::ConstString &name, uint32_t byte_size,
+				 bool has_discriminant) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
-  RustType *type = new RustStruct(name, byte_size);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  RustType *type = new RustStruct(name, byte_size, has_discriminant);
+  return CacheType(name, type);
 }
 
 CompilerType
-RustASTContext::CreateTupleType(const lldb_private::ConstString &name, uint32_t byte_size) {
+RustASTContext::CreateTupleType(const lldb_private::ConstString &name, uint32_t byte_size,
+				bool has_discriminant) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
-  RustType *type = new RustTuple(name, byte_size);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  RustType *type = new RustTuple(name, byte_size, has_discriminant);
+  return CacheType(name, type);
 }
 
 CompilerType
@@ -1469,8 +1512,7 @@ RustASTContext::CreateUnionType(const lldb_private::ConstString &name, uint32_t 
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustUnion(name, byte_size);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 CompilerType
@@ -1480,8 +1522,7 @@ RustASTContext::CreatePointerType(const lldb_private::ConstString &name,
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustPointer(name, pointee_type, byte_size);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
@@ -1506,8 +1547,7 @@ RustASTContext::CreateFunctionType(const lldb_private::ConstString &name,
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustFunction(name, m_pointer_byte_size, return_type, std::move(params));
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
 }
 
 CompilerType
@@ -1515,9 +1555,18 @@ RustASTContext::CreateVoidType() {
   ConstString name("()");
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
-  RustType *type = new RustTuple(name, 0);
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  RustType *type = new RustTuple(name, 0, false);
+  return CacheType(name, type);
+}
+
+CompilerType
+RustASTContext::CreateEnumType(const lldb_private::ConstString &name,
+			       uint64_t byte_size,
+			       std::vector<unsigned> &&discriminant_path) {
+  if (RustType *cached = FindCachedType(name))
+    return CompilerType(this, cached);
+  RustType *type = new RustEnum(name, byte_size, std::move(discriminant_path));
+  return CacheType(name, type);
 }
 
 CompilerType
@@ -1527,8 +1576,20 @@ RustASTContext::CreateCLikeEnumType(const lldb_private::ConstString &name,
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustCLikeEnum(name, underlying_type, std::move(values));
-  m_types[name].reset(type);
-  return CompilerType(this, type);
+  return CacheType(name, type);
+}
+
+bool
+RustASTContext::TypeHasDiscriminant(const CompilerType &type) {
+  if (!type)
+    return false;
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  if (!ast)
+    return false;
+  RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
+  if (RustAggregateBase *a = rtype->AsAggregate())
+    return a->HasDiscriminant();
+  return false;
 }
 
 DWARFASTParser *RustASTContext::GetDWARFParser() {

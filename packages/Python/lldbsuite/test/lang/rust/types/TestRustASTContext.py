@@ -116,6 +116,7 @@ class TestRustASTContext(TestBase):
         mytypelist.append(('&i8', 'vi8ref', address_size, None))
         mytypelist.append(('&mut u8', 'vu8ref', address_size, None))
         mytypelist.append(('CLikeEnum', 'vclikeenum', 1, 'CLikeEnum::MinusOne'))
+        mytypelist.append(('SimpleEnum', 'vsimpleenum', 6, 'SimpleEnum::Two(83, 92)'))
 
         for (name, vname, size, value) in mytypelist:
             v = self.var(vname)

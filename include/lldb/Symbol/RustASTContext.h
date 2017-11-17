@@ -117,16 +117,23 @@ public:
 				  const CompilerType &return_type,
                                   const std::vector<CompilerType> &&params);
 
-  CompilerType CreateStructType(const ConstString &name, uint32_t byte_size);
-  CompilerType CreateTupleType(const ConstString &name, uint32_t byte_size);
+  CompilerType CreateStructType(const ConstString &name, uint32_t byte_size,
+				bool has_discriminant);
+  CompilerType CreateTupleType(const ConstString &name, uint32_t byte_size,
+			       bool has_discriminant);
   CompilerType CreateUnionType(const ConstString &name, uint32_t byte_size);
   CompilerType CreateCLikeEnumType(const lldb_private::ConstString &name,
 				   const CompilerType &underlying_type,
 				   std::map<uint64_t, std::string> &&values);
+  CompilerType CreateEnumType(const lldb_private::ConstString &name,
+			      uint64_t byte_size,
+			      std::vector<unsigned> &&discriminant_path);
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,
                         uint32_t byte_offset);
+
+  bool TypeHasDiscriminant(const CompilerType &type);
 
   //----------------------------------------------------------------------
   // Tests
@@ -402,9 +409,11 @@ public:
 private:
   int m_pointer_byte_size;
   std::map<ConstString, std::unique_ptr<RustType>> m_types;
+  std::set<std::unique_ptr<RustType>> m_anon_types;
   std::unique_ptr<DWARFASTParser> m_dwarf_ast_parser_ap;
 
   RustType *FindCachedType(const lldb_private::ConstString &name);
+  CompilerType CacheType(const lldb_private::ConstString &name, RustType *new_type);
 
   RustASTContext(const RustASTContext &) = delete;
   const RustASTContext &operator=(const RustASTContext &) = delete;

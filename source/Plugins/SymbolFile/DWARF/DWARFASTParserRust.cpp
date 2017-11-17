@@ -377,12 +377,17 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
 }
 
 struct Field {
-  Field() : name(nullptr), byte_offset(-1)
+  Field()
+    : is_discriminant(false),
+      name(nullptr),
+      byte_offset(-1)
   {
   }
 
+  bool is_discriminant;
   const char *name;
   DWARFFormValue type;
+  CompilerType compiler_type;
   uint32_t byte_offset;
 };
 
@@ -434,6 +439,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   // zero-length tuple struct.
   bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
   bool numeric_names = true;
+  unsigned field_index = 0;
 
   ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
@@ -444,6 +450,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 	switch (attr.first) {
 	case DW_AT_name:
 	  new_field.name = attr.second.AsCString();
+	  if (field_index == 0 && strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
+	    new_field.is_discriminant = true;
 	  break;
 	case DW_AT_type:
 	  new_field.type = attr.second;
@@ -471,11 +479,20 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 	}
       }
 
-      if (numeric_names) {
+      if (new_field.is_discriminant) {
+	// Don't check this field name, and don't increment field_index.
+	// When we see a tuple with fields like
+	//   RUST$ENUM$DISR
+	//   __0
+	//   __1
+	//   etc
+	// ... it means the tuple is a member type of an enum.
+      } else if (numeric_names) {
 	char buf[32];
-	snprintf (buf, sizeof (buf), "__%lu", (unsigned long) fields.size());
+	snprintf (buf, sizeof (buf), "__%u", field_index);
 	if (!new_field.name || strcmp(new_field.name, buf) != 0)
 	  numeric_names = false;
+	++field_index;
       }
 
       fields.push_back(new_field);
@@ -487,23 +504,57 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     // after all, somehow.
     is_tuple = false;
   } else if (!is_tuple) {
-    // If we saw numeric names in sequence, we may have a tuple
-    // struct; but if there were no fields, then we can't tell and so
-    // we arbitrarily choose an empty struct.
-    is_tuple = !fields.empty();
+    // If we saw numeric names in sequence, we have a tuple struct;
+    // but if there were no fields, then we can't tell and so we
+    // arbitrarily choose an empty struct.
+    is_tuple = field_index > 0;
   }
+
+  // This is true if this is a union, there are multiple fields and
+  // each field's type has a discriminant.
+  bool all_have_discriminants = is_union && fields.size() > 0;
+  // This is true if the current type has a discriminant.
+  // all_have_discriminants records whether the outer type is a Rust
+  // enum; this records whether the current type is one variant type
+  // of the enum.
+  bool has_discriminant = fields.size() > 0 && fields[0].is_discriminant;
+
+  // See the comment by m_discriminant to understand this.
+  DIERef save_discr = m_discriminant;
+  if (has_discriminant)
+    m_discriminant = DIERef(fields[0].type);
+
+  // Have to resolve the field types before creating the outer type,
+  // so that we can see whether or not this is an enum.
+  for (auto &&field : fields) {
+    Type *type = die.ResolveTypeUID(DIERef(field.type));
+    if (type) {
+      field.compiler_type = type->GetFullCompilerType();
+      if (all_have_discriminants)
+	all_have_discriminants = m_ast.TypeHasDiscriminant(field.compiler_type);
+    }
+  }
+
+  m_discriminant = save_discr;
 
   bool compiler_type_was_created = false;
   CompilerType compiler_type(&m_ast,
 			     dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
   if (!compiler_type) {
     compiler_type_was_created = true;
-    if (is_union)
+
+    if (all_have_discriminants) {
+      // In this case, the discriminant is easily computed as the 0th
+      // field of the 0th field.
+      std::vector<unsigned> discriminant_path { 0, 0 };
+      compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
+					   std::move(discriminant_path));
+    } else if (is_union)
       compiler_type = m_ast.CreateUnionType(type_name_const_str, byte_size);
     else if (is_tuple)
-      compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size);
+      compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size, has_discriminant);
     else
-      compiler_type = m_ast.CreateStructType(type_name_const_str, byte_size);
+      compiler_type = m_ast.CreateStructType(type_name_const_str, byte_size, has_discriminant);
   }
 
   type_sp.reset(new Type(die.GetID(), dwarf, type_name_const_str,
@@ -511,13 +562,11 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 			 Type::eEncodingIsUID, &decl, compiler_type,
 			 Type::eResolveStateForward));
 
-
+  // Now add the fields.
   for (auto &&field : fields) {
-    Type *type = die.ResolveTypeUID(DIERef(field.type));
-    if (type) {
+    if (field.compiler_type) {
       ConstString name(is_tuple ? "" : field.name);
-      CompilerType member_type = type->GetFullCompilerType();
-      m_ast.AddFieldToStruct(compiler_type, name, member_type, field.byte_offset);
+      m_ast.AddFieldToStruct(compiler_type, name, field.compiler_type, field.byte_offset);
     }
   }
 
@@ -564,6 +613,13 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE
       }
       break;
     }
+  }
+
+  // See the comment by m_discriminant to understand this; but this
+  // allows registering two types of the same name when reading a Rust
+  // enum.
+  if (die.GetDIERef() == m_discriminant) {
+    type_name_const_str.Clear();
   }
 
   std::map<uint64_t, std::string> values;

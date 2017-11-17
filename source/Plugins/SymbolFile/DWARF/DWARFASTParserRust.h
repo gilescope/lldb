@@ -21,6 +21,7 @@
 #include "DWARFASTParser.h"
 #include "DWARFDIE.h"
 #include "DWARFDefines.h"
+#include "DIERef.h"
 #include "lldb/Core/PluginInterface.h"
 #include "lldb/Symbol/RustASTContext.h"
 
@@ -73,6 +74,13 @@ private:
   lldb::TypeSP ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE &die);
 
   lldb_private::RustASTContext &m_ast;
+
+  // The Rust compiler will emit a DW_TAG_enumeration_type for the
+  // type of an enum discriminant.  However, this type will have the
+  // same name as the enum type itself.  So, when we expect to read
+  // the enumeration type, we set this member, and ParseCLikeEnum
+  // avoids giving the name to the enumeration type.
+  DIERef m_discriminant;
 };
 
 #endif // SymbolFileDWARF_DWARFASTParserRust_h_

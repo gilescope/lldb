@@ -73,6 +73,8 @@ private:
   lldb::TypeSP ParseStructureType(const DWARFDIE &die);
   lldb::TypeSP ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE &die);
 
+  std::vector<unsigned> ParseDiscriminantPath(const char **in_str);
+
   lldb_private::RustASTContext &m_ast;
 
   // The Rust compiler will emit a DW_TAG_enumeration_type for the

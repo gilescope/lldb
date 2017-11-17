@@ -379,17 +379,58 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
 struct Field {
   Field()
     : is_discriminant(false),
+      is_elided(false),
       name(nullptr),
       byte_offset(-1)
   {
   }
 
   bool is_discriminant;
+  // True if this field is the field that was elided by the non-zero
+  // optimization.
+  bool is_elided;
   const char *name;
   DWARFFormValue type;
   CompilerType compiler_type;
   uint32_t byte_offset;
 };
+
+static bool starts_with(const char *str, const char *prefix) {
+  return strncmp(str, prefix, strlen(prefix)) == 0;
+}
+
+#define RUST_ENCODED_PREFIX "RUST$ENCODED$ENUM$"
+
+std::vector<unsigned> DWARFASTParserRust::ParseDiscriminantPath(const char **in_str) {
+  std::vector<unsigned> result;
+  const char *str = *in_str;
+
+  assert(starts_with(str, RUST_ENCODED_PREFIX));
+  str += strlen(RUST_ENCODED_PREFIX);
+
+  // We're going to push a synthetic unit struct field as the enum
+  // type's first member, so the resulting discriminant path always
+  // starts with 1.
+  result.push_back(1);
+
+  while (*str >= '0' && *str <= '9') {
+    char *next;
+    unsigned long value = strtoul(str, &next, 10);
+    result.push_back(value);
+    str = next;
+    if (*str != '*') {
+      // Report an error?
+      *in_str = nullptr;
+      result.clear();
+      return result;
+    }
+    ++str;
+  }
+
+  // At this point, STR points to the name of the elided member type.
+  *in_str = str;
+  return result;
+}
 
 TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   const bool is_union = die.Tag() == DW_TAG_union_type;
@@ -441,6 +482,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   bool numeric_names = true;
   unsigned field_index = 0;
 
+  std::vector<unsigned> discriminant_path;
+
   ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
     if (child_die.Tag() == DW_TAG_member) {
@@ -450,8 +493,31 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 	switch (attr.first) {
 	case DW_AT_name:
 	  new_field.name = attr.second.AsCString();
-	  if (fields.size() == 0 && strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
-	    new_field.is_discriminant = true;
+	  if (fields.size() == 0) {
+	    if (strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
+	      new_field.is_discriminant = true;
+	    else if (starts_with(new_field.name, RUST_ENCODED_PREFIX) == 0) {
+	      // The "non-zero" optimization has been applied.
+	      // In this case, we'll see a single field like:
+	      //   RUST$ENCODED$ENUM$n0$n1...$Name
+	      // Here n0, n1, ... are integers that describe the path
+	      // to the discriminant.  When the discriminant (and
+	      // integer) is 0, the enum has the value Name, a
+	      // unit-like struct.  However when it is non-zero, the
+	      // enum has the value of this field's type.
+
+	      // Here we're going to push an initial field for the
+	      // unit-like struct.
+	      Field unit_field;
+	      unit_field.name = new_field.name;
+	      // We'll get this from the type, later on.
+	      new_field.name = nullptr;
+
+	      discriminant_path = ParseDiscriminantPath(&unit_field.name);
+	      unit_field.is_elided = true;
+	      fields.push_back(unit_field);
+	    }
+	  }
 	  break;
 	case DW_AT_type:
 	  new_field.type = attr.second;
@@ -527,11 +593,23 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   // Have to resolve the field types before creating the outer type,
   // so that we can see whether or not this is an enum.
   for (auto &&field : fields) {
-    Type *type = die.ResolveTypeUID(DIERef(field.type));
-    if (type) {
-      field.compiler_type = type->GetFullCompilerType();
-      if (all_have_discriminants)
-	all_have_discriminants = m_ast.TypeHasDiscriminant(field.compiler_type);
+    if (field.is_elided) {
+      // A unit-like struct with the given name.  The byte size
+      // probably doesn't matter.
+      ConstString name (field.name);
+      field.compiler_type = m_ast.CreateStructType(name, 1, false);
+    } else {
+      Type *type = die.ResolveTypeUID(DIERef(field.type));
+      if (type) {
+	field.compiler_type = type->GetFullCompilerType();
+	if (all_have_discriminants)
+	  all_have_discriminants = m_ast.TypeHasDiscriminant(field.compiler_type);
+      }
+    }
+
+    // Fix up the field's name by taking it from the type if necessary.
+    if (field.name == nullptr) {
+      field.name = field.compiler_type.GetTypeName().AsCString();
     }
   }
 
@@ -546,10 +624,13 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     if (all_have_discriminants) {
       // In this case, the discriminant is easily computed as the 0th
       // field of the 0th field.
-      std::vector<unsigned> discriminant_path { 0, 0 };
+      discriminant_path = std::vector<unsigned> { 0, 0 };
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
 					   std::move(discriminant_path));
-    } else if (is_union)
+    } else if (!discriminant_path.empty())
+      compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
+					   std::move(discriminant_path));
+    else if (is_union)
       compiler_type = m_ast.CreateUnionType(type_name_const_str, byte_size);
     else if (is_tuple)
       compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size, has_discriminant);

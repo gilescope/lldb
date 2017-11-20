@@ -781,7 +781,7 @@ bool RustASTContext::IsPossibleDynamicType(lldb::opaque_compiler_type_t type,
   if (target_type)
     target_type->Clear();
   // FIXME eventually we'll handle trait object pointers here
-  if (RustEnum *e = static_cast<RustType *>(type)->AsEnum())
+  if (static_cast<RustType *>(type)->AsEnum())
     return true;
   return false;
 }

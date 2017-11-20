@@ -27,6 +27,11 @@ pub enum SimpleEnum {
     Two(u16, u16)
 }
 
+pub enum OptimizedEnum {
+    Null,
+    NonNull(Box<u8>)
+}
+
 fn main() {
     let vbool: bool = true;
 
@@ -64,6 +69,7 @@ fn main() {
     let vclikeenum = CLikeEnum::MinusOne;
 
     let vsimpleenum = SimpleEnum::Two(83, 92);
+    let voptenum = OptimizedEnum::Null;
 
     do_nothing();               // breakpoint
 }

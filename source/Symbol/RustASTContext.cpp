@@ -38,6 +38,7 @@ namespace lldb_private {
 class RustAggregateBase;
 class RustArray;
 class RustCLikeEnum;
+class RustEnum;
 class RustFunction;
 class RustIntegral;
 class RustPointer;
@@ -68,6 +69,7 @@ public:
   virtual RustAggregateBase *AsAggregate() { return nullptr; }
   virtual RustArray *AsArray () { return nullptr; }
   virtual RustCLikeEnum *AsCLikeEnum() { return nullptr; }
+  virtual RustEnum *AsEnum() { return nullptr; }
   virtual RustFunction *AsFunction() { return nullptr; }
   virtual RustIntegral *AsInteger () { return nullptr; }
   virtual RustPointer *AsPointer () { return nullptr; }
@@ -469,6 +471,8 @@ public:
 
   DISALLOW_COPY_AND_ASSIGN(RustEnum);
 
+  RustEnum *AsEnum() override { return this; }
+
   const char *Tag() const override {
     return "enum ";
   }
@@ -776,8 +780,9 @@ bool RustASTContext::IsPossibleDynamicType(lldb::opaque_compiler_type_t type,
 					   bool check_cplusplus, bool check_objc) {
   if (target_type)
     target_type->Clear();
-  // FIXME eventually we'll handle trait object pointers here?
-  // FIXME and enums
+  // FIXME eventually we'll handle trait object pointers here
+  if (RustEnum *e = static_cast<RustType *>(type)->AsEnum())
+    return true;
   return false;
 }
 

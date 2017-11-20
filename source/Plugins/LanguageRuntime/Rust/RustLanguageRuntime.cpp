@@ -59,7 +59,7 @@ uint32_t RustLanguageRuntime::GetPluginVersion() {
 }
 
 bool RustLanguageRuntime::CouldHaveDynamicValue(ValueObject &in_value) {
-  return true;
+  return in_value.GetCompilerType().IsPossibleDynamicType(nullptr, false, false);
 }
 
 bool RustLanguageRuntime::GetDynamicTypeAndAddress(
@@ -74,7 +74,5 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
 TypeAndOrName
 RustLanguageRuntime::FixUpDynamicType(const TypeAndOrName &type_and_or_name,
                                       ValueObject &static_value) {
-  // Stub for now.
-  TypeAndOrName ret(type_and_or_name);
-  return ret;
+  return type_and_or_name;
 }

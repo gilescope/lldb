@@ -464,7 +464,7 @@ public:
 // A Rust enum, not a C-like enum.
 class RustEnum : public RustAggregateBase {
 public:
-  RustEnum(const ConstString &name, uint64_t byte_size, std::vector<unsigned> &&discriminant_path)
+  RustEnum(const ConstString &name, uint64_t byte_size, std::vector<size_t> &&discriminant_path)
     : RustAggregateBase(name, byte_size),
       m_discriminant_path(std::move(discriminant_path))
   {}
@@ -493,7 +493,7 @@ private:
   // synthetic, i.e., when the "NonZero" optimization is applied).
   // The resulting discriminant can be used as an index into the
   // fields to find the true type of the enum instance.
-  std::vector<unsigned> m_discriminant_path;
+  std::vector<size_t> m_discriminant_path;
 };
 
 class RustFunction : public RustType {
@@ -1567,7 +1567,7 @@ RustASTContext::CreateVoidType() {
 CompilerType
 RustASTContext::CreateEnumType(const lldb_private::ConstString &name,
 			       uint64_t byte_size,
-			       std::vector<unsigned> &&discriminant_path) {
+			       std::vector<size_t> &&discriminant_path) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
   RustType *type = new RustEnum(name, byte_size, std::move(discriminant_path));

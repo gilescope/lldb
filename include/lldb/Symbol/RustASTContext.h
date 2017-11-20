@@ -127,7 +127,7 @@ public:
 				   std::map<uint64_t, std::string> &&values);
   CompilerType CreateEnumType(const lldb_private::ConstString &name,
 			      uint64_t byte_size,
-			      std::vector<unsigned> &&discriminant_path);
+			      std::vector<size_t> &&discriminant_path);
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,

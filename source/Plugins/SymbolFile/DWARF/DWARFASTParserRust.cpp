@@ -401,8 +401,8 @@ static bool starts_with(const char *str, const char *prefix) {
 
 #define RUST_ENCODED_PREFIX "RUST$ENCODED$ENUM$"
 
-std::vector<unsigned> DWARFASTParserRust::ParseDiscriminantPath(const char **in_str) {
-  std::vector<unsigned> result;
+std::vector<size_t> DWARFASTParserRust::ParseDiscriminantPath(const char **in_str) {
+  std::vector<size_t> result;
   const char *str = *in_str;
 
   assert(starts_with(str, RUST_ENCODED_PREFIX));
@@ -482,7 +482,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   bool numeric_names = true;
   unsigned field_index = 0;
 
-  std::vector<unsigned> discriminant_path;
+  std::vector<size_t> discriminant_path;
 
   ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
@@ -624,7 +624,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     if (all_have_discriminants) {
       // In this case, the discriminant is easily computed as the 0th
       // field of the 0th field.
-      discriminant_path = std::vector<unsigned> { 0, 0 };
+      discriminant_path = std::vector<size_t> { 0, 0 };
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
 					   std::move(discriminant_path));
     } else if (!discriminant_path.empty())

@@ -496,7 +496,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 	  if (fields.size() == 0) {
 	    if (strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
 	      new_field.is_discriminant = true;
-	    else if (starts_with(new_field.name, RUST_ENCODED_PREFIX) == 0) {
+	    else if (starts_with(new_field.name, RUST_ENCODED_PREFIX)) {
 	      // The "non-zero" optimization has been applied.
 	      // In this case, we'll see a single field like:
 	      //   RUST$ENCODED$ENUM$n0$n1...$Name

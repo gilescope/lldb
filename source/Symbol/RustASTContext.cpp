@@ -509,7 +509,9 @@ public:
 
 private:
 
-  // The offset and byte size of the discriminant.
+  // The offset and byte size of the discriminant.  Note that, as a
+  // special case, if there is only a single field then the
+  // discriminant will be assumed not to exist.
   uint32_t m_discr_offset;
   uint32_t m_discr_byte_size;
 };

@@ -513,7 +513,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
   std::vector<size_t> discriminant_path;
 
-  ModuleSP module_sp = die.GetDWARF()->GetObjectFile()->GetModule();
+  ModuleSP module_sp = die.GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
     if (child_die.Tag() == DW_TAG_member) {
       Field new_field;

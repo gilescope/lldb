@@ -126,12 +126,13 @@ public:
 				   const CompilerType &underlying_type,
 				   std::map<uint64_t, std::string> &&values);
   CompilerType CreateEnumType(const lldb_private::ConstString &name,
-			      uint64_t byte_size,
-			      std::vector<size_t> &&discriminant_path);
+			      uint64_t byte_size, uint32_t discr_offset,
+			      uint32_t discr_byte_size);
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,
                         uint32_t byte_offset);
+  void FinishAggregateInitialization(const CompilerType &type);
 
   bool TypeHasDiscriminant(const CompilerType &type);
 

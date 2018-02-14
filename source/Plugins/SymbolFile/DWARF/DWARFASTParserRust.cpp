@@ -432,6 +432,35 @@ std::vector<size_t> DWARFASTParserRust::ParseDiscriminantPath(const char **in_st
   return result;
 }
 
+void DWARFASTParserRust::FindDiscriminantLocation(CompilerType type,
+						  std::vector<size_t> &&path,
+						  uint64_t &offset,
+						  uint64_t &byte_size) {
+  offset = 0;
+
+  for (size_t index : path) {
+    std::string ignore_name;
+    uint32_t bitsize_ignore, bitoffset_ignore;
+    bool isbase_ignore, isderef_ignore;
+    uint64_t lang_flags_ignore;
+
+    uint32_t this_size;
+    int32_t this_offset;
+
+    type = m_ast.GetChildCompilerTypeAtIndex(type.GetOpaqueQualType(), nullptr, index,
+					     false, false, true,
+					     ignore_name,
+					     this_size, this_offset,
+					     bitsize_ignore, bitoffset_ignore,
+					     isbase_ignore, isderef_ignore,
+					     nullptr, lang_flags_ignore);
+    offset += this_offset;
+    // The last time this is done, it will hold the size of the final
+    // field, which is what we want.
+    byte_size = this_size;
+  }
+}
+
 TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   const bool is_union = die.Tag() == DW_TAG_union_type;
 
@@ -624,13 +653,25 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     if (all_have_discriminants) {
       // In this case, the discriminant is easily computed as the 0th
       // field of the 0th field.
-      discriminant_path = std::vector<size_t> { 0, 0 };
+      discriminant_path = std::vector<size_t> { 0 };
+
+      uint64_t discr_offset, discr_byte_size;
+      FindDiscriminantLocation(fields[0].compiler_type, std::move(discriminant_path),
+			       discr_offset, discr_byte_size);
+
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
-					   std::move(discriminant_path));
-    } else if (!discriminant_path.empty())
+					   discr_offset, discr_byte_size);
+    } else if (!discriminant_path.empty()) {
+      CompilerType start_type = fields[discriminant_path[0]].compiler_type;
+      discriminant_path.erase(discriminant_path.begin());
+
+      uint64_t discr_offset, discr_byte_size;
+      FindDiscriminantLocation(start_type, std::move(discriminant_path),
+			       discr_offset, discr_byte_size);
+
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
-					   std::move(discriminant_path));
-    else if (is_union)
+					   discr_offset, discr_byte_size);
+    } else if (is_union)
       compiler_type = m_ast.CreateUnionType(type_name_const_str, byte_size);
     else if (is_tuple)
       compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size, has_discriminant);
@@ -650,6 +691,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
       m_ast.AddFieldToStruct(compiler_type, name, field.compiler_type, field.byte_offset);
     }
   }
+
+  m_ast.FinishAggregateInitialization(compiler_type);
 
   // Add our type to the unique type map so we don't
   // end up creating many copies of the same type over

@@ -345,8 +345,21 @@ public:
     m_fields.emplace_back(name, type, offset);
   }
 
+  virtual void FinishInitialization() {
+  }
+
   bool HasDiscriminant() const {
     return m_has_discriminant;
+  }
+
+  // With the old-style enum encoding, after the discriminant's
+  // location is computed the member types no longer need to have
+  // theirs, so they are dropped.
+  void DropDiscriminant() {
+    if (m_has_discriminant) {
+      m_has_discriminant = false;
+      m_fields.erase(m_fields.begin());
+    }
   }
 
   const Field *FieldAt(size_t idx) {
@@ -412,6 +425,15 @@ public:
     return ")";
   }
 
+  void FinishInitialization() override {
+    for (auto&& iter : *this) {
+      RustType *rtype = static_cast<RustType *>(iter.m_type.GetOpaqueQualType());
+      if (RustAggregateBase* agg = rtype->AsAggregate()) {
+	agg->DropDiscriminant();
+      }
+    }
+  }
+
 private:
 
   // As opposed to a tuple struct.
@@ -464,9 +486,11 @@ public:
 // A Rust enum, not a C-like enum.
 class RustEnum : public RustAggregateBase {
 public:
-  RustEnum(const ConstString &name, uint64_t byte_size, std::vector<size_t> &&discriminant_path)
+  RustEnum(const ConstString &name, uint64_t byte_size,
+	   uint32_t discr_offset, uint32_t discr_byte_size)
     : RustAggregateBase(name, byte_size),
-      m_discriminant_path(std::move(discriminant_path))
+      m_discr_offset(discr_offset),
+      m_discr_byte_size(discr_byte_size)
   {}
 
   DISALLOW_COPY_AND_ASSIGN(RustEnum);
@@ -485,15 +509,9 @@ public:
 
 private:
 
-  // The discriminant path tells us the indices of the fields to
-  // access in order to find the discriminant value.  The discriminant
-  // may be several fields "deep", so this is a vector.  Note that the
-  // 0th index here tells us which field of this enum to start with
-  // (this can be nonzero in the situation where the first field is
-  // synthetic, i.e., when the "NonZero" optimization is applied).
-  // The resulting discriminant can be used as an index into the
-  // fields to find the true type of the enum instance.
-  std::vector<size_t> m_discriminant_path;
+  // The offset and byte size of the discriminant.
+  uint32_t m_discr_offset;
+  uint32_t m_discr_byte_size;
 };
 
 class RustFunction : public RustType {
@@ -1566,11 +1584,11 @@ RustASTContext::CreateVoidType() {
 
 CompilerType
 RustASTContext::CreateEnumType(const lldb_private::ConstString &name,
-			       uint64_t byte_size,
-			       std::vector<size_t> &&discriminant_path) {
+			       uint64_t byte_size, uint32_t discr_offset,
+			       uint32_t discr_byte_size) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
-  RustType *type = new RustEnum(name, byte_size, std::move(discriminant_path));
+  RustType *type = new RustEnum(name, byte_size, discr_offset, discr_byte_size);
   return CacheType(name, type);
 }
 
@@ -1595,6 +1613,18 @@ RustASTContext::TypeHasDiscriminant(const CompilerType &type) {
   if (RustAggregateBase *a = rtype->AsAggregate())
     return a->HasDiscriminant();
   return false;
+}
+
+void
+RustASTContext::FinishAggregateInitialization(const CompilerType &type) {
+  if (!type)
+    return;
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  if (!ast)
+    return;
+  RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
+  if (RustAggregateBase *a = rtype->AsAggregate())
+    a->FinishInitialization();
 }
 
 DWARFASTParser *RustASTContext::GetDWARFParser() {

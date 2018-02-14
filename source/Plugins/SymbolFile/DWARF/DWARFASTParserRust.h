@@ -74,6 +74,9 @@ private:
   lldb::TypeSP ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE &die);
 
   std::vector<size_t> ParseDiscriminantPath(const char **in_str);
+  void FindDiscriminantLocation(lldb_private::CompilerType type,
+				std::vector<size_t> &&path,
+				uint64_t &offset, uint64_t &byte_size);
 
   lldb_private::RustASTContext &m_ast;
 

@@ -24,6 +24,7 @@
 #include "DIERef.h"
 #include "lldb/Core/PluginInterface.h"
 #include "lldb/Symbol/RustASTContext.h"
+#include "DWARFFormValue.h"
 
 class DWARFDebugInfoEntry;
 class DWARFDIECollection;
@@ -79,6 +80,29 @@ private:
 				uint64_t &offset, uint64_t &byte_size);
 
   lldb_private::RustASTContext &m_ast;
+
+  struct Field {
+    Field()
+      : is_discriminant(false),
+	is_elided(false),
+	name(nullptr),
+	byte_offset(-1)
+    {
+    }
+
+    bool is_discriminant;
+    // True if this field is the field that was elided by the non-zero
+    // optimization.
+    bool is_elided;
+    const char *name;
+    DWARFFormValue type;
+    lldb_private::CompilerType compiler_type;
+    uint32_t byte_offset;
+  };
+
+  std::vector<Field> ParseFields(const DWARFDIE &die,
+				 std::vector<size_t> &discriminant_path,
+				 bool &is_tuple);
 
   // The Rust compiler will emit a DW_TAG_enumeration_type for the
   // type of an enum discriminant.  However, this type will have the

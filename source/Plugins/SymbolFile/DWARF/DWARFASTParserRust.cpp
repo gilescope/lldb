@@ -376,25 +376,6 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
   return type_sp;
 }
 
-struct Field {
-  Field()
-    : is_discriminant(false),
-      is_elided(false),
-      name(nullptr),
-      byte_offset(-1)
-  {
-  }
-
-  bool is_discriminant;
-  // True if this field is the field that was elided by the non-zero
-  // optimization.
-  bool is_elided;
-  const char *name;
-  DWARFFormValue type;
-  CompilerType compiler_type;
-  uint32_t byte_offset;
-};
-
 static bool starts_with(const char *str, const char *prefix) {
   return strncmp(str, prefix, strlen(prefix)) == 0;
 }
@@ -461,57 +442,15 @@ void DWARFASTParserRust::FindDiscriminantLocation(CompilerType type,
   }
 }
 
-TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
-  const bool is_union = die.Tag() == DW_TAG_union_type;
-
-  bool byte_size_valid = false;
-  uint64_t byte_size = 0;
-  const char *type_name_cstr = NULL;
-  ConstString type_name_const_str;
-  SymbolFileDWARF *dwarf = die.GetDWARF();
-  Declaration decl;
-
-  for (auto &&attr : IterableDIEAttrs(die)) {
-    switch (attr.first) {
-    case DW_AT_name:
-      type_name_cstr = attr.second.AsCString();
-      type_name_const_str.SetCString(type_name_cstr);
-      break;
-
-    case DW_AT_byte_size:
-      byte_size = attr.second.Unsigned();
-      byte_size_valid = true;
-      break;
-    }
-  }
-
-  UniqueDWARFASTType ast_entry;
-  TypeSP type_sp;
-
-  // Only try and unique the type if it has a name.
-  if (type_name_const_str &&
-      dwarf->GetUniqueDWARFASTTypeMap().Find(type_name_const_str, die, &decl,
-					     byte_size_valid ? byte_size : -1, ast_entry)) {
-    // We have already parsed this type.
-    type_sp = ast_entry.m_type_sp;
-    if (type_sp) {
-      dwarf->m_die_to_type[die.GetDIE()] = type_sp.get();
-      return type_sp;
-    }
-  }
-
+std::vector<DWARFASTParserRust::Field>
+DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discriminant_path,
+				bool &is_tuple) {
   // We construct a list of fields and then apply them later so that
   // we can analyze the fields to see what sort of structure this
   // really is.
   std::vector<Field> fields;
-  // Currently, rustc emits tuples with a name starting with "("; but
-  // there's no way to distinguish a zero-length struct from a
-  // zero-length tuple struct.
-  bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
-  bool numeric_names = true;
   unsigned field_index = 0;
-
-  std::vector<size_t> discriminant_path;
+  bool numeric_names = true;
 
   ModuleSP module_sp = die.GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
@@ -604,6 +543,56 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     // arbitrarily choose an empty struct.
     is_tuple = field_index > 0;
   }
+
+  return fields;
+}
+
+TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
+  const bool is_union = die.Tag() == DW_TAG_union_type;
+
+  bool byte_size_valid = false;
+  uint64_t byte_size = 0;
+  const char *type_name_cstr = NULL;
+  ConstString type_name_const_str;
+  SymbolFileDWARF *dwarf = die.GetDWARF();
+  Declaration decl;
+
+  for (auto &&attr : IterableDIEAttrs(die)) {
+    switch (attr.first) {
+    case DW_AT_name:
+      type_name_cstr = attr.second.AsCString();
+      type_name_const_str.SetCString(type_name_cstr);
+      break;
+
+    case DW_AT_byte_size:
+      byte_size = attr.second.Unsigned();
+      byte_size_valid = true;
+      break;
+    }
+  }
+
+  UniqueDWARFASTType ast_entry;
+  TypeSP type_sp;
+
+  // Only try and unique the type if it has a name.
+  if (type_name_const_str &&
+      dwarf->GetUniqueDWARFASTTypeMap().Find(type_name_const_str, die, &decl,
+					     byte_size_valid ? byte_size : -1, ast_entry)) {
+    // We have already parsed this type.
+    type_sp = ast_entry.m_type_sp;
+    if (type_sp) {
+      dwarf->m_die_to_type[die.GetDIE()] = type_sp.get();
+      return type_sp;
+    }
+  }
+
+  // Currently, rustc emits tuples with a name starting with "("; but
+  // there's no way to distinguish a zero-length struct from a
+  // zero-length tuple struct.  This decision might be changed by
+  // ParseFields.
+  bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
+  std::vector<size_t> discriminant_path;
+  std::vector<Field> fields = ParseFields(die, discriminant_path, is_tuple);
 
   // This is true if this is a union, there are multiple fields and
   // each field's type has a discriminant.

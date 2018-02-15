@@ -520,6 +520,20 @@ public:
     }
   }
 
+  void GetDiscriminantLocation(uint64_t &discr_offset, uint64_t &discr_byte_size) {
+    discr_offset = m_discr_offset;
+    discr_byte_size = m_discr_byte_size;
+  }
+
+  CompilerType FindEnumVariant(uint64_t discriminant) {
+    auto iter = m_discriminants.find(discriminant);
+    int idx = m_default;
+    if (iter != m_discriminants.end()) {
+      idx = iter->second;
+    }
+    return FieldAt(idx)->m_type;
+  }
+
 private:
 
   // The offset and byte size of the discriminant.  Note that, as a
@@ -1643,6 +1657,36 @@ RustASTContext::TypeHasDiscriminant(const CompilerType &type) {
   if (RustAggregateBase *a = rtype->AsAggregate())
     return a->HasDiscriminant();
   return false;
+}
+
+bool
+RustASTContext::GetEnumDiscriminantLocation(const CompilerType &type, uint64_t &discr_offset,
+					    uint64_t &discr_byte_size) {
+  if (!type)
+    return false;
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  if (!ast)
+    return false;
+  RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
+  if (RustEnum *e = rtype->AsEnum()) {
+    e->GetDiscriminantLocation(discr_offset, discr_byte_size);
+    return true;
+  }
+  return false;
+}
+
+CompilerType
+RustASTContext::FindEnumVariant(const CompilerType &type, uint64_t discriminant) {
+  if (!type)
+    return CompilerType();
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  if (!ast)
+    return CompilerType();
+  RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
+  if (RustEnum *e = rtype->AsEnum()) {
+    return e->FindEnumVariant(discriminant);
+  }
+  return CompilerType();
 }
 
 void

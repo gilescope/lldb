@@ -137,6 +137,15 @@ public:
 
   bool TypeHasDiscriminant(const CompilerType &type);
 
+  // Return true and set the out params if the type is a Rust enum;
+  // return false otherwise.
+  bool GetEnumDiscriminantLocation(const CompilerType &type, uint64_t &discr_offset,
+				   uint64_t &discr_byte_size);
+
+  // Given an actual discriminant value, find the correct enum variant
+  // type.
+  CompilerType FindEnumVariant(const CompilerType &type, uint64_t discriminant);
+
   //----------------------------------------------------------------------
   // Tests
   //----------------------------------------------------------------------

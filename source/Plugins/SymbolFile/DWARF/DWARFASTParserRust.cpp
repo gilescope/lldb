@@ -462,9 +462,18 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
     discriminant_die = die.GetReferencedDIE(DW_AT_discr);
   }
 
+  // For old-style ("RUST$ENUM$DISR"-using) enums that don't have the
+  // NonZero optimization applied, variants are listed in order of
+  // discriminant.  We track that value here.
+  uint64_t naive_discriminant = 0;
+
   ModuleSP module_sp = die.GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
     Field new_field;
+
+    // If this isn't correct for this particular enum, that's ok,
+    // because the correct value will be computed below.
+    new_field.discriminant = naive_discriminant++;
 
     if (is_variant && child_die.Tag() == DW_TAG_variant) {
       // Find the discriminant, if it exists.

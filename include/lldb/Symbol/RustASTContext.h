@@ -131,7 +131,8 @@ public:
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,
-                        uint32_t byte_offset);
+                        uint32_t byte_offset,
+			bool is_default, uint64_t discriminant);
   void FinishAggregateInitialization(const CompilerType &type);
 
   bool TypeHasDiscriminant(const CompilerType &type);

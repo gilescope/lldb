@@ -86,7 +86,9 @@ private:
       : is_discriminant(false),
 	is_elided(false),
 	name(nullptr),
-	byte_offset(-1)
+	byte_offset(-1),
+	is_default(false),
+	discriminant(0)
     {
     }
 
@@ -98,11 +100,17 @@ private:
     DWARFFormValue type;
     lldb_private::CompilerType compiler_type;
     uint32_t byte_offset;
+
+    // These are used if this is a member of an enum type.
+    bool is_default;
+    uint64_t discriminant;
   };
 
   std::vector<Field> ParseFields(const DWARFDIE &die,
 				 std::vector<size_t> &discriminant_path,
-				 bool &is_tuple);
+				 bool &is_tuple,
+				 uint64_t &discr_offset, uint64_t &discr_byte_size,
+				 bool &saw_discr);
 
   // The Rust compiler will emit a DW_TAG_enumeration_type for the
   // type of an enum discriminant.  However, this type will have the

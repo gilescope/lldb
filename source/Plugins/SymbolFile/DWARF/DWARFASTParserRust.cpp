@@ -444,7 +444,9 @@ void DWARFASTParserRust::FindDiscriminantLocation(CompilerType type,
 
 std::vector<DWARFASTParserRust::Field>
 DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discriminant_path,
-				bool &is_tuple) {
+				bool &is_tuple,
+				uint64_t &discr_offset, uint64_t &discr_byte_size,
+				bool &saw_discr) {
   // We construct a list of fields and then apply them later so that
   // we can analyze the fields to see what sort of structure this
   // really is.
@@ -452,11 +454,46 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
   unsigned field_index = 0;
   bool numeric_names = true;
 
+  // We might have recursed in here with a variant part.  If so, we
+  // want to handle the discriminant and variants specially.
+  bool is_variant = die.Tag() == DW_TAG_variant_part;
+  DWARFDIE discriminant_die;
+  if (is_variant) {
+    discriminant_die = die.GetReferencedDIE(DW_AT_discr);
+  }
+
   ModuleSP module_sp = die.GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
-    if (child_die.Tag() == DW_TAG_member) {
-      Field new_field;
+    Field new_field;
 
+    if (is_variant && child_die.Tag() == DW_TAG_variant) {
+      // Find the discriminant, if it exists.
+      for (auto &&attr : IterableDIEAttrs(child_die)) {
+	if (attr.first == DW_AT_discr_value) {
+	  new_field.discriminant = attr.second.Unsigned();
+	  break;
+	}
+      }
+
+      // Use the child that is a member.
+      bool found = false;
+      for (auto &&variant_child_die : IterableDIEChildren(child_die)) {
+	if (variant_child_die.Tag() == DW_TAG_member) {
+	  found = true;
+	  child_die = variant_child_die;
+	  break;
+	}
+      }
+      if (!found) {
+	// Just ignore this variant.
+	continue;
+      }
+
+      // Fall through and process the variant's child as if it were a
+      // child of the structure.
+    }
+
+    if (child_die.Tag() == DW_TAG_member) {
       for (auto &&attr : IterableDIEAttrs(child_die)) {
 	switch (attr.first) {
 	case DW_AT_name:
@@ -475,15 +512,16 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 	      // enum has the value of this field's type.
 
 	      // Here we're going to push an initial field for the
-	      // unit-like struct.
+	      // unit-like struct.  Note that the constructor sets the
+	      // discriminant to the correct value -- zero.
 	      Field unit_field;
 	      unit_field.name = new_field.name;
-	      // We'll get this from the type, later on.
-	      new_field.name = nullptr;
-
 	      discriminant_path = ParseDiscriminantPath(&unit_field.name);
 	      unit_field.is_elided = true;
 	      fields.push_back(unit_field);
+
+	      // The actual field is the default variant.
+	      new_field.is_default = true;
 	    }
 	  }
 	  break;
@@ -499,11 +537,11 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 	    uint32_t block_length = attr.second.Unsigned();
 	    uint32_t block_offset = attr.second.BlockData() - debug_info_data.GetDataStart();
 	    if (DWARFExpression::Evaluate(
-                    NULL, // ExecutionContext *
-		    NULL, // RegisterContext *
-		    module_sp, debug_info_data, die.GetCU(), block_offset,
-		    block_length, eRegisterKindDWARF, &initialValue, NULL,
-		    memberOffset, NULL)) {
+					  NULL, // ExecutionContext *
+					  NULL, // RegisterContext *
+					  module_sp, debug_info_data, die.GetCU(), block_offset,
+					  block_length, eRegisterKindDWARF, &initialValue, NULL,
+					  memberOffset, NULL)) {
 	      new_field.byte_offset = memberOffset.ResolveValue(NULL).UInt();
 	    }
 	  } else {
@@ -513,23 +551,37 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 	}
       }
 
-      if (new_field.is_discriminant) {
-	// Don't check this field name, and don't increment field_index.
-	// When we see a tuple with fields like
-	//   RUST$ENUM$DISR
-	//   __0
-	//   __1
-	//   etc
-	// ... it means the tuple is a member type of an enum.
-      } else if (numeric_names) {
-	char buf[32];
-	snprintf (buf, sizeof (buf), "__%u", field_index);
-	if (!new_field.name || strcmp(new_field.name, buf) != 0)
-	  numeric_names = false;
-	++field_index;
-      }
+      if (child_die == discriminant_die) {
+	// This field is the discriminant, so don't push it, but instead
+	// record this for the caller.
+	saw_discr = true;
+	discr_offset = new_field.byte_offset;
+	discr_byte_size = m_ast.GetBitSize(new_field.compiler_type.GetOpaqueQualType(),
+					   nullptr) / 8;
+      } else if (child_die.Tag() == DW_TAG_variant_part) {
+	// New-style enum representation -- nothing useful is in the
+	// enclosing struct, so we can just recurse here.
+	return ParseFields(child_die, discriminant_path, is_tuple,
+			   discr_offset, discr_byte_size, saw_discr);
+      } else {
+	if (new_field.is_discriminant) {
+	  // Don't check this field name, and don't increment field_index.
+	  // When we see a tuple with fields like
+	  //   RUST$ENUM$DISR
+	  //   __0
+	  //   __1
+	  //   etc
+	  // ... it means the tuple is a member type of an enum.
+	} else if (numeric_names) {
+	  char buf[32];
+	  snprintf (buf, sizeof (buf), "__%u", field_index);
+	  if (!new_field.name || strcmp(new_field.name, buf) != 0)
+	    numeric_names = false;
+	  ++field_index;
+	}
 
-      fields.push_back(new_field);
+	fields.push_back(new_field);
+      }
     }
   }
 
@@ -591,8 +643,11 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   // zero-length tuple struct.  This decision might be changed by
   // ParseFields.
   bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
+  bool saw_discr = false;
+  uint64_t discr_offset, discr_byte_size;
   std::vector<size_t> discriminant_path;
-  std::vector<Field> fields = ParseFields(die, discriminant_path, is_tuple);
+  std::vector<Field> fields = ParseFields(die, discriminant_path, is_tuple,
+					  discr_offset, discr_byte_size, saw_discr);
 
   // This is true if this is a union, there are multiple fields and
   // each field's type has a discriminant.
@@ -614,7 +669,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     if (field.is_elided) {
       // A unit-like struct with the given name.  The byte size
       // probably doesn't matter.
-      ConstString name (field.name);
+      ConstString name(field.name);
       field.compiler_type = m_ast.CreateStructType(name, 1, false);
     } else {
       Type *type = die.ResolveTypeUID(DIERef(field.type));
@@ -639,12 +694,14 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   if (!compiler_type) {
     compiler_type_was_created = true;
 
-    if (all_have_discriminants) {
+    if (saw_discr) {
+      compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
+					   discr_offset, discr_byte_size);
+    } else if (all_have_discriminants) {
       // In this case, the discriminant is easily computed as the 0th
       // field of the 0th field.
       discriminant_path = std::vector<size_t> { 0 };
 
-      uint64_t discr_offset, discr_byte_size;
       FindDiscriminantLocation(fields[0].compiler_type, std::move(discriminant_path),
 			       discr_offset, discr_byte_size);
 
@@ -654,7 +711,6 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
       CompilerType start_type = fields[discriminant_path[0]].compiler_type;
       discriminant_path.erase(discriminant_path.begin());
 
-      uint64_t discr_offset, discr_byte_size;
       FindDiscriminantLocation(start_type, std::move(discriminant_path),
 			       discr_offset, discr_byte_size);
 
@@ -677,7 +733,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   for (auto &&field : fields) {
     if (field.compiler_type) {
       ConstString name(is_tuple ? "" : field.name);
-      m_ast.AddFieldToStruct(compiler_type, name, field.compiler_type, field.byte_offset);
+      m_ast.AddFieldToStruct(compiler_type, name, field.compiler_type, field.byte_offset,
+			     field.is_default, field.discriminant);
     }
   }
 

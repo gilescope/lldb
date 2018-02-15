@@ -31,6 +31,8 @@
 // #include "Plugins/ExpressionParser/Rust/RustUserExpression.h"
 #include "Plugins/SymbolFile/DWARF/DWARFASTParserRust.h"
 
+#include <unordered_map>
+
 using namespace lldb;
 
 namespace lldb_private {
@@ -490,7 +492,8 @@ public:
 	   uint32_t discr_offset, uint32_t discr_byte_size)
     : RustAggregateBase(name, byte_size),
       m_discr_offset(discr_offset),
-      m_discr_byte_size(discr_byte_size)
+      m_discr_byte_size(discr_byte_size),
+      m_default(-1)
   {}
 
   DISALLOW_COPY_AND_ASSIGN(RustEnum);
@@ -507,6 +510,16 @@ public:
     return "}";
   }
 
+  // Record the discriminant for the most recently added field.
+  void RecordDiscriminant(bool is_default, uint64_t discriminant) {
+    int value = int(FieldCount() - 1);
+    if (is_default) {
+      m_default = value;
+    } else {
+      m_discriminants[discriminant] = value;
+    }
+  }
+
 private:
 
   // The offset and byte size of the discriminant.  Note that, as a
@@ -514,6 +527,14 @@ private:
   // discriminant will be assumed not to exist.
   uint32_t m_discr_offset;
   uint32_t m_discr_byte_size;
+
+  // The index in m_fields of the default variant.  -1 if there is no
+  // default variant.
+  int m_default;
+
+  // This maps from discriminant values to indices in m_fields.  This
+  // is used to find the correct variant given a discriminant value.
+  std::unordered_map<uint64_t, int> m_discriminants;
 };
 
 class RustFunction : public RustType {
@@ -1553,7 +1574,8 @@ RustASTContext::CreatePointerType(const lldb_private::ConstString &name,
 void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
 				      const lldb_private::ConstString &name,
 				      const CompilerType &field_type,
-				      uint32_t byte_offset) {
+				      uint32_t byte_offset,
+				      bool is_default, uint64_t discriminant) {
   if (!struct_type)
     return;
   RustASTContext *ast =
@@ -1561,8 +1583,12 @@ void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
   if (!ast)
     return;
   RustType *type = static_cast<RustType *>(struct_type.GetOpaqueQualType());
-  if (RustAggregateBase *a = type->AsAggregate())
+  if (RustAggregateBase *a = type->AsAggregate()) {
     a->AddField(name, field_type, byte_offset);
+    if (RustEnum *e = type->AsEnum()) {
+      e->RecordDiscriminant(is_default, discriminant);
+    }
+  }
 }
 
 CompilerType

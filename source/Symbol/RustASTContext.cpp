@@ -28,7 +28,7 @@
 
 #include "llvm/Support/Threading.h"
 
-// #include "Plugins/ExpressionParser/Rust/RustUserExpression.h"
+#include "Plugins/ExpressionParser/Rust/RustUserExpression.h"
 #include "Plugins/SymbolFile/DWARF/DWARFASTParserRust.h"
 
 #include <unordered_map>

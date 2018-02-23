@@ -8,6 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "RustUserExpression.h"
+#include "lldb/Core/ValueObject.h"
+#include "lldb/Symbol/RustASTContext.h"
 
 using namespace lldb_private;
 using namespace lldb;
@@ -16,7 +18,7 @@ static RustASTContext *
 GetASTContext(ValueObjectSP val, Status &error)
 {
   RustASTContext *result =
-    llvm::dyn_cast_or_null<RustASTContext>(val.GetCompilerType().GetTypeSystem());
+    llvm::dyn_cast_or_null<RustASTContext>(val->GetCompilerType().GetTypeSystem());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
@@ -55,7 +57,7 @@ static ValueObjectSP
 UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   if (RustASTContext *ast = GetASTContext(val, error)) {
-    CompilerType type = val.GetCompilerType();
+    CompilerType type = val->GetCompilerType();
     if (type.IsScalarType() && !ast->IsBooleanType(type.GetOpaqueQualType())) {
       return val;
     }
@@ -68,14 +70,14 @@ static ValueObjectSP
 UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   if (RustASTContext *ast = GetASTContext(val, error)) {
-    CompilerType type = val.GetCompilerType();
+    CompilerType type = val->GetCompilerType();
     if (!type.IsScalarType() || ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a scalar type");
       return ValueObjectSP();
     }
 
     Scalar scalar;
-    if (!val.ResolveValue(scalar)) {
+    if (!val->ResolveValue(scalar)) {
       error.SetErrorString("could not resolve scalar value");
       return ValueObjectSP();
     }
@@ -92,14 +94,14 @@ UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 static ValueObjectSP
 UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
-  CompilerType type = val.GetCompilerType();
+  CompilerType type = val->GetCompilerType();
   if (!type.IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
 
   Scalar scalar;
-  if (!val.ResolveValue(scalar)) {
+  if (!val->ResolveValue(scalar)) {
     error.SetErrorString("could not resolve scalar value");
     return ValueObjectSP();
   }
@@ -117,7 +119,7 @@ UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
   if (RustASTContext *ast = GetASTContext(val, error)) {
     // FIXME - or just CreateIntegralType ?
     CompilerType type = ast->GetRustTypeByName("usize");
-    Scalar size (val.GetByteSize());
+    Scalar size (val->GetByteSize());
     return CreateValueFromScalar(exe_ctx, size, type, error);
   }
   return ValueObjectSP();
@@ -128,13 +130,13 @@ static ValueObjectSP
 BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 		 Status &error)
 {
-  if (!left.GetCompilerType().IsScalarType() || !right.GetCompilerType().IsScalarType()) {
+  if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
 
   Scalar sleft, sright;
-  if (!left.ResolveValue(sleft) || !right.ResolveValue(sright)) {
+  if (!left->ResolveValue(sleft) || !right->ResolveValue(sright)) {
     error.SetErrorString("could not resolve scalar value");
     return ValueObjectSP();
   }
@@ -154,13 +156,13 @@ static ValueObjectSP
 Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 	    Status &error)
 {
-  if (!left.GetCompilerType().IsScalarType() || !right.GetCompilerType().IsScalarType()) {
+  if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
 
   Scalar sleft, sright;
-  if (!left.ResolveValue(sleft) || !right.ResolveValue(sright)) {
+  if (!left->ResolveValue(sleft) || !right->ResolveValue(sright)) {
     error.SetErrorString("could not resolve scalar value");
     return ValueObjectSP();
   }
@@ -175,12 +177,12 @@ static ValueObjectSP
 ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 	    Status &error)
 {
-  if (!left.GetCompilerType().IsScalarType() || !right.GetCompilerType().IsScalarType()) {
+  if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
   if (RustASTContext *ast = GetASTContext(right, error)) {
-    CompilerType type = right.GetCompilerType();
+    CompilerType type = right->GetCompilerType();
     if (ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a scalar type");
       return ValueObjectSP();
@@ -188,13 +190,13 @@ ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObje
   }
 
   Scalar sright;
-  if (!right.ResolveValue(sright)) {
+  if (!right->ResolveValue(sright)) {
     error.SetErrorString("could not resolve scalar value");
     return ValueObjectSP();
   }
   unsigned long index = sright.ULong(-1);
 
-  ValueObjectSP result = left.GetChildAtIndex(index, true);
+  ValueObjectSP result = left->GetChildAtIndex(index, true);
   if (!result) {
     error.SetErrorString("array index out of bounds");
   }
@@ -216,14 +218,14 @@ RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
   }
 
   if (RustASTContext *ast = GetASTContext(vleft, error)) {
-    CompilerType type = vleft.GetCompilerType();
+    CompilerType type = vleft->GetCompilerType();
     if (!ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a boolean type");
       return ValueObjectSP();
     }
 
     Scalar sleft;
-    if (!vleft.ResolveValue(sleft)) {
+    if (!vleft->ResolveValue(sleft)) {
       error.SetErrorString("could not resolve scalar value");
       return ValueObjectSP();
     }
@@ -252,14 +254,14 @@ RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
   }
 
   if (RustASTContext *ast = GetASTContext(vleft, error)) {
-    CompilerType type = vleft.GetCompilerType();
+    CompilerType type = vleft->GetCompilerType();
     if (!ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a boolean type");
       return ValueObjectSP();
     }
 
     Scalar sleft;
-    if (!vleft.ResolveValue(sleft)) {
+    if (!vleft->ResolveValue(sleft)) {
       error.SetErrorString("could not resolve scalar value");
       return ValueObjectSP();
     }
@@ -287,9 +289,9 @@ RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
     return left;
   }
 
-  ValueObjectSP result = left->GetChildMemberWithName(m_field);
+  ValueObjectSP result = left->GetChildMemberWithName(ConstString(m_field.c_str()), true);
   if (!result) {
-    error.SetErrorStringWithFormat("no field named %s", m_field);
+    error.SetErrorStringWithFormat("no field named %s", m_field.c_str());
   }
   return result;
 }
@@ -326,5 +328,6 @@ lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnos
 						      lldb::UserExpressionSP &shared_ptr_to_me,
 						      lldb::ExpressionVariableSP &result)
 {
-  ValueObjectSP value = m_expr->Evaluate(exe_ctx);
+  Status error;
+  ValueObjectSP value = m_expr->Evaluate(exe_ctx, error);
 }

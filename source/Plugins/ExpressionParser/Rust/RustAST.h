@@ -138,7 +138,7 @@ public:
 
   RustFieldExpression(std::unique_ptr<RustExpression> &&left, llvm::StringRef field)
     : m_left(std::move(left)),
-      m_field(field)
+      m_field(field.str())
   {
   }
 
@@ -147,7 +147,7 @@ public:
 private:
 
   std::unique_ptr<RustExpression> m_left;
-  llvm::StringRef m_field;
+  std::string m_field;
 };
 
 class RustTupleFieldExpression : public RustExpression {

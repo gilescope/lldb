@@ -20,10 +20,11 @@ namespace lldb_private {
 class RustExpression {
 public:
 
-  virtual lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx) = 0;
+  virtual lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) = 0;
 };
 
-typedef lldb::ValueObjectSP (*RustUnaryOperator)(ExecutionContext &, lldb::ValueObjectSP);
+typedef lldb::ValueObjectSP (*RustUnaryOperator)(ExecutionContext &, lldb::ValueObjectSP,
+                                                 Status &error);
 
 template<RustUnaryOperator OP>
 class RustUnaryExpression : public RustExpression {
@@ -34,9 +35,11 @@ public:
   {
   }
 
-  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx) override {
-    lldb::ValueObjectSP value = m_expr->Evaluate(exe_ctx);
-    return OP(exe_ctx, value);
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    lldb::ValueObjectSP value = m_expr->Evaluate(exe_ctx, error);
+    if (!value)
+      return value;
+    return OP(exe_ctx, value, error);
   }
 
 private:
@@ -45,7 +48,8 @@ private:
 };
 
 typedef lldb::ValueObjectSP (*RustBinaryOperator)(ExecutionContext &,
-						  lldb::ValueObjectSP, lldb::ValueObjectSP);
+                                                  lldb::ValueObjectSP, lldb::ValueObjectSP,
+                                                  Status &error);
 
 template<RustBinaryOperator OP>
 class RustBinaryExpression : public RustExpression {
@@ -57,11 +61,33 @@ public:
   {
   }
 
-  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx) override {
-    lldb::ValueObjectSP left = m_left->Evaluate(exe_ctx);
-    lldb::ValueObjectSP right = m_right->Evaluate(exe_ctx);
-    return OP(exe_ctx, left, right);
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    lldb::ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
+    if (!left)
+      return left;
+    lldb::ValueObjectSP right = m_right->Evaluate(exe_ctx, error);
+    if (!right)
+      return right;
+    return OP(exe_ctx, left, right, error);
   }
+
+private:
+
+  std::unique_ptr<RustExpression> m_left;
+  std::unique_ptr<RustExpression> m_right;
+};
+
+class RustRangeExpression : public RustExpression {
+public:
+
+  // Either or both can be NULL here.
+  RustRangeExpression(RustExpression *left, RustExpression *right)
+    : m_left(left),
+      m_right(right)
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 
@@ -78,10 +104,7 @@ public:
   {
   }
 
-  // lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx) override {
-  //   lldb::ValueObjectSP left = m_low_up->Evaluate(exe_ctx);
-  //   fixme;
-  // }
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 

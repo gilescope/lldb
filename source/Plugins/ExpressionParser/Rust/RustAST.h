@@ -78,6 +78,42 @@ private:
   std::unique_ptr<RustExpression> m_right;
 };
 
+class RustAndAndExpression : public RustExpression {
+public:
+
+  RustAndAndExpression(std::unique_ptr<RustExpression> &&left,
+		       std::unique_ptr<RustExpression> &&right)
+    : m_left(std::move(left)),
+      m_right(std::move(right))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  std::unique_ptr<RustExpression> m_left;
+  std::unique_ptr<RustExpression> m_right;
+};
+
+class RustOrOrExpression : public RustExpression {
+public:
+
+  RustOrOrExpression(std::unique_ptr<RustExpression> &&left,
+		     std::unique_ptr<RustExpression> &&right)
+    : m_left(std::move(left)),
+      m_right(std::move(right))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  std::unique_ptr<RustExpression> m_left;
+  std::unique_ptr<RustExpression> m_right;
+};
+
 class RustRangeExpression : public RustExpression {
 public:
 
@@ -114,6 +150,39 @@ private:
   llvm::StringRef m_field;
 };
 
+class RustTupleFieldExpression : public RustExpression {
+public:
+
+  RustTupleFieldExpression(std::unique_ptr<RustExpression> &&left, uint32_t field)
+    : m_left(std::move(left)),
+      m_field(field)
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  std::unique_ptr<RustExpression> m_left;
+  uint32_t m_field;
+};
+
+class RustLiteral : public RustExpression {
+public:
+
+  RustLiteral(Scalar value, CompilerType type)
+    : m_value(value),
+      m_type(type)
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  Scalar m_value;
+  CompilerType m_type;
+};
 
 } // namespace lldb_private
 

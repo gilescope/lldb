@@ -101,12 +101,12 @@ public:
   CompilerType CreateVoidType();
   CompilerType CreateBoolType(const lldb_private::ConstString &name);
   CompilerType CreateIntegralType(const lldb_private::ConstString &name,
-				  bool is_signed, uint64_t byte_size);
+                                  bool is_signed, uint64_t byte_size);
   CompilerType CreateFloatType(const lldb_private::ConstString &name,
-			       uint64_t byte_size);
+                               uint64_t byte_size);
   CompilerType CreatePointerType(const lldb_private::ConstString &name,
-				 const CompilerType &pointee_type,
-				 uint32_t byte_size);
+                                 const CompilerType &pointee_type,
+                                 uint32_t byte_size);
 
   CompilerType CreateArrayType(const CompilerType &element_type,
                                uint64_t length);
@@ -114,25 +114,25 @@ public:
   CompilerType CreateTypedefType(const ConstString &name, CompilerType impl);
 
   CompilerType CreateFunctionType(const lldb_private::ConstString &name,
-				  const CompilerType &return_type,
+                                  const CompilerType &return_type,
                                   const std::vector<CompilerType> &&params);
 
   CompilerType CreateStructType(const ConstString &name, uint32_t byte_size,
-				bool has_discriminant);
+                                bool has_discriminant);
   CompilerType CreateTupleType(const ConstString &name, uint32_t byte_size,
-			       bool has_discriminant);
+                               bool has_discriminant);
   CompilerType CreateUnionType(const ConstString &name, uint32_t byte_size);
   CompilerType CreateCLikeEnumType(const lldb_private::ConstString &name,
-				   const CompilerType &underlying_type,
-				   std::map<uint64_t, std::string> &&values);
+                                   const CompilerType &underlying_type,
+                                   std::map<uint64_t, std::string> &&values);
   CompilerType CreateEnumType(const lldb_private::ConstString &name,
-			      uint64_t byte_size, uint32_t discr_offset,
-			      uint32_t discr_byte_size);
+                              uint64_t byte_size, uint32_t discr_offset,
+                              uint32_t discr_byte_size);
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,
                         uint32_t byte_offset,
-			bool is_default, uint64_t discriminant);
+                        bool is_default, uint64_t discriminant);
   void FinishAggregateInitialization(const CompilerType &type);
 
   bool TypeHasDiscriminant(const CompilerType &type);
@@ -140,7 +140,7 @@ public:
   // Return true and set the out params if the type is a Rust enum;
   // return false otherwise.
   bool GetEnumDiscriminantLocation(const CompilerType &type, uint64_t &discr_offset,
-				   uint64_t &discr_byte_size);
+                                   uint64_t &discr_byte_size);
 
   // Given an actual discriminant value, find the correct enum variant
   // type.
@@ -192,6 +192,8 @@ public:
   bool IsScalarType(lldb::opaque_compiler_type_t type) override;
 
   bool IsVoidType(lldb::opaque_compiler_type_t type) override;
+
+  bool IsBooleanType(lldb::opaque_compiler_type_t type);
 
   bool SupportsLanguage(lldb::LanguageType language) override;
 

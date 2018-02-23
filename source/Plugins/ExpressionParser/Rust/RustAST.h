@@ -30,8 +30,8 @@ template<RustUnaryOperator OP>
 class RustUnaryExpression : public RustExpression {
 public:
 
-  explicit RustUnaryExpression(RustExpression *expr)
-    : m_expr(expr)
+  explicit RustUnaryExpression(std::unique_ptr<RustExpression> &&expr)
+    : m_expr(std::move(expr))
   {
   }
 
@@ -55,9 +55,10 @@ template<RustBinaryOperator OP>
 class RustBinaryExpression : public RustExpression {
 public:
 
-  RustBinaryExpression(RustExpression *left, RustExpression *right)
-    : m_left(left),
-      m_right(right)
+  RustBinaryExpression(std::unique_ptr<RustExpression> &&left,
+		       std::unique_ptr<RustExpression> &&right)
+    : m_left(std::move(left)),
+      m_right(std::move(right))
   {
   }
 
@@ -81,9 +82,10 @@ class RustRangeExpression : public RustExpression {
 public:
 
   // Either or both can be NULL here.
-  RustRangeExpression(RustExpression *left, RustExpression *right)
-    : m_left(left),
-      m_right(right)
+  RustRangeExpression(std::unique_ptr<RustExpression> &&left,
+		      std::unique_ptr<RustExpression> &&right)
+    : m_left(std::move(left)),
+      m_right(std::move(right))
   {
   }
 
@@ -98,8 +100,8 @@ private:
 class RustFieldExpression : public RustExpression {
 public:
 
-  RustFieldExpression(RustExpression *left, llvm::StringRef field)
-    : m_left(left),
+  RustFieldExpression(std::unique_ptr<RustExpression> &&left, llvm::StringRef field)
+    : m_left(std::move(left)),
       m_field(field)
   {
   }

@@ -117,8 +117,8 @@ static ValueObjectSP
 UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   if (RustASTContext *ast = GetASTContext(val, error)) {
-    // FIXME - or just CreateIntegralType ?
-    CompilerType type = ast->GetRustTypeByName("usize");
+    uint32_t ptr_size = ast->GetPointerByteSize();
+    CompilerType type = ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
     Scalar size (val->GetByteSize());
     return CreateValueFromScalar(exe_ctx, size, type, error);
   }

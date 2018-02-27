@@ -11,6 +11,7 @@
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Symbol/RustASTContext.h"
 
+using namespace lldb_private::rust;
 using namespace lldb_private;
 using namespace lldb;
 
@@ -41,19 +42,19 @@ CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType ty
   return result;
 }
 
-static ValueObjectSP
+ValueObjectSP
 UnaryDereference(ExecutionContext &exe_ctx, ValueObjectSP addr, Status &error)
 {
   return addr->Dereference(error);
 }
 
-static ValueObjectSP
+ValueObjectSP
 UnaryAddr(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   return val->AddressOf(error);
 }
 
-static ValueObjectSP
+ValueObjectSP
 UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   if (RustASTContext *ast = GetASTContext(val, error)) {
@@ -66,7 +67,7 @@ UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
   return ValueObjectSP();
 }
 
-static ValueObjectSP
+ValueObjectSP
 UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   if (RustASTContext *ast = GetASTContext(val, error)) {
@@ -91,7 +92,7 @@ UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
   return ValueObjectSP();
 }
 
-static ValueObjectSP
+ValueObjectSP
 UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   CompilerType type = val->GetCompilerType();
@@ -113,7 +114,7 @@ UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
   return CreateValueFromScalar(exe_ctx, scalar, type, error);
 }
 
-static ValueObjectSP
+ValueObjectSP
 UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
   if (RustASTContext *ast = GetASTContext(val, error)) {
@@ -126,7 +127,7 @@ UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 }
 
 template<const Scalar OP(const Scalar &, const Scalar &)>
-static ValueObjectSP
+ValueObjectSP
 BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 		 Status &error)
 {
@@ -189,7 +190,7 @@ BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::Valu
 }
 
 template<bool OP(const Scalar &, const Scalar &)>
-static ValueObjectSP
+ValueObjectSP
 Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 	    Status &error)
 {
@@ -216,7 +217,7 @@ Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObje
   return CreateValueFromScalar(exe_ctx, value, type, error);
 }
 
-static ValueObjectSP
+ValueObjectSP
 ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 	    Status &error)
 {

@@ -17,6 +17,36 @@
 
 namespace lldb_private {
 
+// Functions which are used in the templates below to construct
+// various expression nodes.
+namespace rust {
+
+lldb::ValueObjectSP UnaryDereference(ExecutionContext &exe_ctx, lldb::ValueObjectSP addr,
+				     Status &error);
+lldb::ValueObjectSP UnaryAddr(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
+			      Status &error);
+lldb::ValueObjectSP UnaryPlus(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
+			      Status &error);
+lldb::ValueObjectSP UnaryNegate(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
+				Status &error);
+lldb::ValueObjectSP UnaryComplement(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
+				    Status &error);
+lldb::ValueObjectSP UnarySizeof(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
+				Status &error);
+
+template<const Scalar OP(const Scalar &, const Scalar &)>
+lldb::ValueObjectSP BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
+				     lldb::ValueObjectSP right, Status &error);
+
+template<bool OP(const Scalar &, const Scalar &)>
+lldb::ValueObjectSP Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
+				lldb::ValueObjectSP right, Status &error);
+
+lldb::ValueObjectSP ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
+				lldb::ValueObjectSP right, Status &error);
+
+}
+
 class RustExpression {
 public:
 

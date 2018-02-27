@@ -156,6 +156,11 @@ static ValueObjectSP
 Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 	    Status &error)
 {
+  RustASTContext *ast = GetASTContext(left, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+
   if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
@@ -168,9 +173,10 @@ Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObje
   }
 
   bool result = OP(sleft, sright);
+  Scalar value = int(result);
 
-  // FIXME get the boolean type
-  return CreateValueFromScalar(exe_ctx, result, type, error);
+  CompilerType type = ast->CreateBoolType(ConstString("bool"));
+  return CreateValueFromScalar(exe_ctx, value, type, error);
 }
 
 static ValueObjectSP

@@ -130,6 +130,11 @@ static ValueObjectSP
 BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 		 Status &error)
 {
+  RustASTContext *ast = GetASTContext(left, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+
   if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
@@ -147,7 +152,39 @@ BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::Valu
     return ValueObjectSP();
   }
 
-  // FIXME find the result type we chose.
+  size_t byte_size = result.GetByteSize();
+  CompilerType type;
+
+  // FIXME there has to be a better way.
+  switch (result.GetType()) {
+  case Scalar::e_sint:
+  case Scalar::e_slong:
+  case Scalar::e_slonglong:
+    type = ast->CreateIntrinsicIntegralType(true, byte_size);
+    break;
+
+  case Scalar::e_uint:
+  case Scalar::e_ulong:
+  case Scalar::e_ulonglong:
+    type = ast->CreateIntrinsicIntegralType(false, byte_size);
+    break;
+
+  case Scalar::e_float:
+  case Scalar::e_double:
+    if (byte_size == 4) {
+      type = ast->CreateFloatType(ConstString("f32"), byte_size);
+      break;
+    } else if (byte_size == 8) {
+      type = ast->CreateFloatType(ConstString("f64"), byte_size);
+      break;
+    }
+    /* FALL THROUGH */
+
+  default:
+    error.SetErrorString("unknown type resulting from binary operation");
+    return ValueObjectSP();
+  }
+
   return CreateValueFromScalar(exe_ctx, result, type, error);
 }
 

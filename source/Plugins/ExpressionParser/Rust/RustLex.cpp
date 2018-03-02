@@ -315,7 +315,10 @@ Token Lexer::String(bool is_byte) {
     m["sizeof"] = SIZEOF;
     m[".."] = DOTDOT;
     m["||"] = OROR;
+    m["|="] = OR_EQ;
     m["&&"] = ANDAND;
+    m["&="] = AND_EQ;
+    m["^="] = XOR_EQ;
     m["=="] = EQEQ;
     m["!="] = NOTEQ;
     m["<="] = LTEQ;

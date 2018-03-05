@@ -34,7 +34,7 @@ RustExpressionUP Parser::Unary(Status &error) {
 
 bool Parser::ExprList(std::vector<RustExpressionUP> *exprs, Status &error) {
   while (true) {
-    RustExpressionUP expr = Binary(error);
+    RustExpressionUP expr = Expr(error);
     if (!expr) {
       return false;
     }
@@ -61,7 +61,7 @@ RustExpressionUP Parser::Parens(Status &error) {
     return Unimplemented(error);
   }
 
-  RustExpressionUP expr = Binary(error);
+  RustExpressionUP expr = Expr(error);
   if (!expr) {
     return expr;
   }
@@ -95,7 +95,7 @@ RustExpressionUP Parser::Array(Status &error) {
   assert(CurrentToken().kind == '[');
   Advance();
 
-  RustExpressionUP expr = Binary(error);
+  RustExpressionUP expr = Expr(error);
   if (!expr) {
     return expr;
   }
@@ -174,7 +174,7 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
   assert(CurrentToken().kind == '[');
   Advance();
 
-  RustExpressionUP idx = Binary(error);
+  RustExpressionUP idx = Expr(error);
   if (!idx) {
     return idx;
   }

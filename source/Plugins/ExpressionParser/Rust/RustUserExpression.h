@@ -17,12 +17,13 @@
 namespace lldb_private {
 
 class RustUserExpression : public UserExpression {
+public:
+
   RustUserExpression(ExecutionContextScope &exe_scope, llvm::StringRef expr,
                      llvm::StringRef prefix, lldb::LanguageType language,
                      ResultType desired_type,
                      const EvaluateExpressionOptions &options)
-    : UserExpression(exe_scope, expr, prefix, language, desired_type, options),
-      m_expr(nullptr)
+    : UserExpression(exe_scope, expr, prefix, language, desired_type, options)
   {
   }
 
@@ -54,7 +55,7 @@ protected:
 
 private:
 
-  std::unique_ptr<RustExpression> m_expr;
+  RustExpressionUP m_expr;
 };
 
 } // namespace lldb_private

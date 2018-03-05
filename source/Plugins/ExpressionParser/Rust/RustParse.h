@@ -29,6 +29,10 @@ public:
   {
   }
 
+  RustExpressionUP Expr(Status &error) {
+    return Binary(error);
+  }
+
 private:
 
   template<RustUnaryOperator OP> RustExpressionUP Unary(Status &error);

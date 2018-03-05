@@ -14,6 +14,8 @@
 
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-private.h"
+#include "lldb/Core/Scalar.h"
+#include "lldb/Symbol/CompilerType.h"
 
 namespace lldb_private {
 
@@ -34,11 +36,11 @@ lldb::ValueObjectSP UnaryComplement(ExecutionContext &exe_ctx, lldb::ValueObject
 lldb::ValueObjectSP UnarySizeof(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
 				Status &error);
 
-template<const Scalar OP(const Scalar &, const Scalar &)>
+template<typename T>
 lldb::ValueObjectSP BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
 				     lldb::ValueObjectSP right, Status &error);
 
-template<bool OP(const Scalar &, const Scalar &)>
+template<typename T>
 lldb::ValueObjectSP Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
 				lldb::ValueObjectSP right, Status &error);
 
@@ -48,10 +50,18 @@ lldb::ValueObjectSP ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
 }
 
 class RustExpression {
+protected:
+
+  RustExpression() { }
+
 public:
+
+  virtual ~RustExpression() { }
 
   virtual lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) = 0;
 };
+
+typedef std::unique_ptr<RustExpression> RustExpressionUP;
 
 typedef lldb::ValueObjectSP (*RustUnaryOperator)(ExecutionContext &, lldb::ValueObjectSP,
                                                  Status &error);
@@ -60,7 +70,7 @@ template<RustUnaryOperator OP>
 class RustUnaryExpression : public RustExpression {
 public:
 
-  explicit RustUnaryExpression(std::unique_ptr<RustExpression> &&expr)
+  explicit RustUnaryExpression(RustExpressionUP &&expr)
     : m_expr(std::move(expr))
   {
   }
@@ -74,7 +84,7 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_expr;
+  RustExpressionUP m_expr;
 };
 
 typedef lldb::ValueObjectSP (*RustBinaryOperator)(ExecutionContext &,
@@ -85,8 +95,8 @@ template<RustBinaryOperator OP>
 class RustBinaryExpression : public RustExpression {
 public:
 
-  RustBinaryExpression(std::unique_ptr<RustExpression> &&left,
-		       std::unique_ptr<RustExpression> &&right)
+  RustBinaryExpression(RustExpressionUP &&left,
+		       RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -104,15 +114,61 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_left;
-  std::unique_ptr<RustExpression> m_right;
+  RustExpressionUP m_left;
+  RustExpressionUP m_right;
+};
+
+template<RustBinaryOperator OP>
+class RustAssignExpression : public RustExpression {
+public:
+
+  RustAssignExpression(RustExpressionUP &&left,
+		       RustExpressionUP &&right)
+    : m_left(std::move(left)),
+      m_right(std::move(right))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    // FIXME
+    lldb::ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
+    if (!left)
+      return left;
+    lldb::ValueObjectSP right = m_right->Evaluate(exe_ctx, error);
+    if (!right)
+      return right;
+    return OP(exe_ctx, left, right, error);
+  }
+
+private:
+
+  RustExpressionUP m_left;
+  RustExpressionUP m_right;
+};
+
+class RustAssignment : public RustExpression {
+public:
+
+  RustAssignment(RustExpressionUP &&left,
+                 RustExpressionUP &&right)
+    : m_left(std::move(left)),
+      m_right(std::move(right))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  RustExpressionUP m_left;
+  RustExpressionUP m_right;
 };
 
 class RustAndAndExpression : public RustExpression {
 public:
 
-  RustAndAndExpression(std::unique_ptr<RustExpression> &&left,
-		       std::unique_ptr<RustExpression> &&right)
+  RustAndAndExpression(RustExpressionUP &&left,
+		       RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -122,15 +178,15 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_left;
-  std::unique_ptr<RustExpression> m_right;
+  RustExpressionUP m_left;
+  RustExpressionUP m_right;
 };
 
 class RustOrOrExpression : public RustExpression {
 public:
 
-  RustOrOrExpression(std::unique_ptr<RustExpression> &&left,
-		     std::unique_ptr<RustExpression> &&right)
+  RustOrOrExpression(RustExpressionUP &&left,
+		     RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -140,16 +196,16 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_left;
-  std::unique_ptr<RustExpression> m_right;
+  RustExpressionUP m_left;
+  RustExpressionUP m_right;
 };
 
 class RustRangeExpression : public RustExpression {
 public:
 
   // Either or both can be NULL here.
-  RustRangeExpression(std::unique_ptr<RustExpression> &&left,
-		      std::unique_ptr<RustExpression> &&right)
+  RustRangeExpression(RustExpressionUP &&left,
+		      RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -159,14 +215,14 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_left;
-  std::unique_ptr<RustExpression> m_right;
+  RustExpressionUP m_left;
+  RustExpressionUP m_right;
 };
 
 class RustFieldExpression : public RustExpression {
 public:
 
-  RustFieldExpression(std::unique_ptr<RustExpression> &&left, llvm::StringRef field)
+  RustFieldExpression(RustExpressionUP &&left, llvm::StringRef field)
     : m_left(std::move(left)),
       m_field(field.str())
   {
@@ -176,14 +232,14 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_left;
+  RustExpressionUP m_left;
   std::string m_field;
 };
 
 class RustTupleFieldExpression : public RustExpression {
 public:
 
-  RustTupleFieldExpression(std::unique_ptr<RustExpression> &&left, uint32_t field)
+  RustTupleFieldExpression(RustExpressionUP &&left, uint32_t field)
     : m_left(std::move(left)),
       m_field(field)
   {
@@ -193,7 +249,7 @@ public:
 
 private:
 
-  std::unique_ptr<RustExpression> m_left;
+  RustExpressionUP m_left;
   uint32_t m_field;
 };
 
@@ -212,6 +268,90 @@ private:
 
   Scalar m_value;
   CompilerType m_type;
+};
+
+class RustTupleExpression : public RustExpression {
+public:
+
+  explicit RustTupleExpression(std::vector<RustExpressionUP> &&exprs)
+    : m_exprs(std::move(exprs))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  std::vector<RustExpressionUP> m_exprs;
+
+};
+
+class RustArrayLiteral : public RustExpression {
+public:
+
+  explicit RustArrayLiteral(std::vector<RustExpressionUP> &&exprs)
+    : m_exprs(std::move(exprs))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  std::vector<RustExpressionUP> m_exprs;
+
+};
+
+class RustArrayWithLength : public RustExpression {
+public:
+
+  RustArrayWithLength(RustExpressionUP &&value, uint64_t length)
+    : m_value(std::move(value)),
+      m_length(length)
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  RustExpressionUP m_value;
+  uint64_t m_length;
+};
+
+class RustCall : public RustExpression {
+public:
+
+  RustCall(RustExpressionUP &&func, std::vector<RustExpressionUP> &&exprs)
+    : m_func(std::move(func)),
+      m_exprs(std::move(exprs))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  RustExpressionUP m_func;
+  std::vector<RustExpressionUP> m_exprs;
+
+};
+
+class RustCast : public RustExpression {
+public:
+
+  RustCast(CompilerType type, RustExpressionUP &&expr)
+    : m_type(type),
+      m_expr(std::move(expr))
+  {
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  CompilerType m_type;
+  RustExpressionUP m_expr;
 };
 
 } // namespace lldb_private

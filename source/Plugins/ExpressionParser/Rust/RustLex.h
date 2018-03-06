@@ -69,6 +69,9 @@ struct Token {
   int kind;
 
   uint64_t uinteger;
+  double dvalue;
+  // This can be NULL if no suffix was specified.
+  const char *number_suffix;
   std::string str;
 
   explicit Token(int kind_)
@@ -76,9 +79,17 @@ struct Token {
   {
   }
 
-  Token(int kind_, uint64_t val_)
+  Token(int kind_, uint64_t val_, const char *suffix_ = nullptr)
     : kind(kind_),
-      uinteger(val_)
+      uinteger(val_),
+      number_suffix(suffix_)
+  {
+  }
+
+  Token(int kind_, double val_, const char *suffix_ = nullptr)
+    : kind(kind_),
+      dvalue(val_),
+      number_suffix(suffix_)
   {
   }
 
@@ -103,11 +114,14 @@ public:
 
 private:
 
+  const char *CheckSuffix(const char *const *suffixes);
+  bool BasicInteger(int *radix_out, std::string *value);
   Token MaybeByteLiteral();
   Token MaybeRawString(bool is_byte = false);
   Token String(bool is_byte = false);
   Token Character(bool is_byte = false);
   Token Operator();
+  int Float(std::string *value);
   Token Number();
   Token Identifier();
   bool AppendEscape(std::string *result, bool is_byte);

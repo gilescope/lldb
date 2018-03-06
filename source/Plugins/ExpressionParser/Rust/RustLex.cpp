@@ -9,11 +9,14 @@
 
 #include "RustLex.h"
 #include "llvm/Support/ConvertUTF.h"
+#include "llvm/ADT/APInt.h"
 
 using namespace lldb_private::rust;
 using namespace lldb_private;
 using namespace lldb;
 using namespace llvm;
+
+llvm::StringMap<TokenKind> *Lexer::m_keywords;
 
 Token Lexer::Next() {
   // Skip whitespace.
@@ -71,9 +74,187 @@ Token Lexer::Operator() {
   return Identifier();
 }
 
+bool Lexer::BasicInteger(int *radix_out, std::string *value) {
+  int radix = 10;
+
+  assert (m_iter != m_end);
+  assert (*m_iter >= '0' && *m_iter <= '9');
+
+  bool need_digit = false;
+  if (radix_out != nullptr && *m_iter == '0') {
+    // Ignore this digit and see if we have a non-decimal integer.
+    ++m_iter;
+    if (m_iter == m_end) {
+      // Plain "0".
+      value->push_back('0');
+      return true;
+    }
+
+    if (*m_iter == 'x') {
+      radix = 16;
+      need_digit = true;
+      ++m_iter;
+    } else if (*m_iter == 'b') {
+      radix = 2;
+      need_digit = true;
+      ++m_iter;
+    } else if (*m_iter == 'o') {
+      radix = 8;
+      need_digit = true;
+      ++m_iter;
+    }
+  }
+
+  for (; m_iter != m_end; ++m_iter) {
+    if (*m_iter == '_') {
+      continue;
+    }
+    if ((radix == 10 || radix == 16) && *m_iter >= '0' && *m_iter <= '9') {
+      // Ok.
+    } else if (radix == 2 && *m_iter >= '0' && *m_iter <= '1') {
+      // Ok.
+    } else if (radix == 8 && *m_iter >= '0' && *m_iter <= '7') {
+      // Ok.
+    } else if (radix == 16 && *m_iter >= 'a' && *m_iter <= 'f') {
+      // Ok.
+    } else if (radix == 16 && *m_iter >= 'A' && *m_iter <= 'F') {
+      // Ok.
+    } else {
+      break;
+    }
+
+    value->push_back(*m_iter);
+    need_digit = false;
+  }
+
+  if (radix_out) {
+    *radix_out = radix;
+  }
+  return !need_digit;
+}
+
+const char *Lexer::CheckSuffix(const char *const *suffixes) {
+  const char *suffix = nullptr;
+
+  size_t left = Remaining();
+  for (int i = 0; suffixes[i]; ++i) {
+    size_t len = strlen(suffixes[i]);
+    if (left >= len) {
+      ::llvm::StringRef text(m_iter, len);
+      if (text == suffixes[i]) {
+        suffix = suffixes[i];
+        m_iter += len;
+        break;
+      }
+    }
+  }
+
+  return suffix;
+}
+
+int Lexer::Float(std::string *value) {
+  assert(m_iter != m_end && (*m_iter == '.' || *m_iter == 'e' || *m_iter == 'E'));
+
+  if (*m_iter == '.') {
+    ++m_iter;
+    if (m_iter == m_end || !(*m_iter >= '0' && *m_iter <= '9')) {
+      // Not a floating-point number.
+      --m_iter;
+      return INTEGER;
+    }
+
+    value->push_back('.');
+    BasicInteger(nullptr, value);
+  }
+
+  if (m_iter == m_end || (*m_iter != 'e' && *m_iter != 'E')) {
+    return FLOAT;
+  }
+
+  value->push_back(*m_iter++);
+  if (m_iter == m_end) {
+    return INVALID;
+  }
+
+  if (*m_iter == '+' || *m_iter == '-') {
+    value->push_back(*m_iter++);
+    if (m_iter == m_end) {
+      return INVALID;
+    }
+  }
+
+  if (!(*m_iter >= '0' && *m_iter <= '9')) {
+    return INVALID;
+  }
+  BasicInteger(nullptr, value);
+  return FLOAT;
+}
+
 Token Lexer::Number() {
-  // FIXME
-  return Token(INVALID);
+  std::string number;
+  int radix;
+
+  if (!BasicInteger(&radix, &number)) {
+    return Token(INVALID);
+  }
+
+  if (m_iter != m_end && radix == 10 &&
+      (*m_iter == '.' || *m_iter == 'e' || *m_iter == 'E')) {
+    int kind = Float(&number);
+    if (kind == INVALID) {
+      return Token(INVALID);
+    }
+    if (kind == FLOAT) {
+      // Actually a float.
+      ::llvm::StringRef sref(number);
+      double dval;
+      if (!sref.getAsDouble(dval)) {
+        return Token(INVALID);
+      }
+
+      static const char * const float_suffixes[] = {
+        "f32",
+        "f64",
+        nullptr
+      };
+
+      const char *suffix = CheckSuffix(float_suffixes);
+
+      return Token(FLOAT, dval, suffix);
+    }
+
+    // Floating-point lex failed but we still have an integer.
+    assert(kind == INTEGER);
+  }
+
+  static const char * const int_suffixes[] = {
+    "u8",
+    "i8",
+    "u16",
+    "i16",
+    "u32",
+    "i32",
+    "u64",
+    "i64",
+    "usize",
+    "isize",
+    nullptr
+  };
+
+  APInt value;
+  ::llvm::StringRef sref(number);
+  if (sref.getAsInteger(radix, value)) {
+    return Token(INVALID);
+  }
+  // FIXME maybe we should just leave it as an APInt through the whole
+  // process.
+  if (value.getNumWords() > 1) {
+    return Token(INVALID);
+  }
+
+  const char *suffix = CheckSuffix(int_suffixes);
+
+  return Token(INTEGER, value.getLimitedValue(), suffix);
 }
 
 Token Lexer::Identifier() {

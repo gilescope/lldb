@@ -156,7 +156,10 @@ public:
   {
   }
 
-  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("assignment unimplemented");
+    return lldb::ValueObjectSP();
+  }
 
 private:
 

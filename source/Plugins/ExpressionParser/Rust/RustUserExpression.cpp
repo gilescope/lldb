@@ -127,7 +127,7 @@ UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
   return ValueObjectSP();
 }
 
-template<const Scalar OP(const Scalar &, const Scalar &)>
+template<typename T>
 ValueObjectSP
 BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 		 Status &error)
@@ -148,7 +148,7 @@ BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::Valu
     return ValueObjectSP();
   }
 
-  Scalar result = OP(sleft, sright);
+  Scalar result = T()(sleft, sright);
   if (result.GetType() == Scalar::e_void) {
     error.SetErrorString("could not resolve scalar value");
     return ValueObjectSP();
@@ -190,7 +190,7 @@ BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::Valu
   return CreateValueFromScalar(exe_ctx, result, type, error);
 }
 
-template<bool OP(const Scalar &, const Scalar &)>
+template<typename T>
 ValueObjectSP
 Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObjectSP right,
 	    Status &error)
@@ -211,7 +211,7 @@ Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left, lldb::ValueObje
     return ValueObjectSP();
   }
 
-  bool result = OP(sleft, sright);
+  bool result = T()(sleft, sright);
   Scalar value = int(result);
 
   CompilerType type = ast->CreateBoolType(ConstString("bool"));

@@ -22,8 +22,9 @@ namespace rust {
 class Parser {
 public:
 
-  explicit Parser(llvm::StringRef ref)
-    : m_lexer(ref),
+  Parser(lldb::TargetSP target, llvm::StringRef ref)
+    : m_target(target),
+      m_lexer(ref),
       // fixme this seems not good
       m_current(m_lexer.Next())
   {
@@ -46,12 +47,14 @@ private:
   RustExpressionUP Term(Status &error);
   RustExpressionUP Binary(Status &error);
   CompilerType Type(Status &error);
+  CompilerType LookupType(ConstString name);
 
   Token &CurrentToken() { return m_current; }
   void Advance() { m_current = m_lexer.Next(); }
 
   RustExpressionUP Unimplemented(Status &error);
 
+  lldb::TargetSP m_target;
   Lexer m_lexer;
   Token m_current;
 };

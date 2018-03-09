@@ -1734,6 +1734,6 @@ UserExpression *RustASTContextForExpr::GetUserExpression(
   TargetSP target = m_target_wp.lock();
   if (target)
     return new RustUserExpression(*target, expr, prefix, language, desired_type,
-                                options);
+                                  options);
   return nullptr;
 }

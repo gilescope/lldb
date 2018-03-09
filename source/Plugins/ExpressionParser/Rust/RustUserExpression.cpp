@@ -23,7 +23,7 @@ bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
 {
   InstallContext(exe_ctx);
 
-  Parser parser(m_expr_text);
+  Parser parser(exe_ctx.GetTargetSP(), m_expr_text);
   Status status;
   m_expr = parser.Expr(status);
   // if (!m_expr) {

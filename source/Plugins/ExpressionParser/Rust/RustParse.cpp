@@ -8,8 +8,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "RustParse.h"
+#include "lldb/Core/Module.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Symbol/RustASTContext.h"
+#include "lldb/Symbol/SymbolFile.h"
+#include "lldb/Symbol/TypeList.h"
+#include "lldb/Target/Target.h"
 #include "lldb/Utility/Status.h"
 #include <functional>
 
@@ -396,6 +400,20 @@ RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error)
 ////////////////////////////////////////////////////////////////
 // The parser
 
+CompilerType Parser::LookupType(ConstString name) {
+  if (!m_target)
+    return CompilerType();
+  SymbolContext sc;
+  TypeList type_list;
+  llvm::DenseSet<SymbolFile *> searched_symbol_files;
+  uint32_t num_matches = m_target->GetImages().FindTypes(
+      sc, name, false, 2, searched_symbol_files, type_list);
+  if (num_matches > 0) {
+    return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
+  }
+  return CompilerType();
+}
+
 // temporary
 RustExpressionUP Parser::Unimplemented(Status &error) {
   error.SetErrorString("unimplemented");
@@ -582,8 +600,31 @@ RustExpressionUP Parser::Term(Status &error) {
   RustExpressionUP term;
 
   switch (CurrentToken().kind) {
-  case INTEGER:
-  case FLOAT:
+  case INTEGER: {
+    const char *suffix = CurrentToken().number_suffix;
+    if (!suffix) {
+      // FIXME
+      suffix = "i64";
+    }
+    // FIXME error check
+    CompilerType type = LookupType(ConstString(suffix));
+    term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger, type);
+    Advance();
+    break;
+  }
+
+  case FLOAT: {
+    const char *suffix = CurrentToken().number_suffix;
+    if (!suffix) {
+      suffix = "f64";
+    }
+    // FIXME error check
+    CompilerType type = LookupType(ConstString(suffix));
+    term = llvm::make_unique<RustLiteral>(CurrentToken().dvalue, type);
+    Advance();
+    break;
+  }
+
   case STRING:
   case BYTESTRING:
     return Unimplemented(error);

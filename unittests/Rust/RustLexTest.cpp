@@ -155,3 +155,11 @@ TEST(RustLexTest, RawByteStrings) {
   TestSingle("br########\"h\"#######i\"########", Token(BYTESTRING, "h\"#######i"));
   TestSingle("br########\"\\'\"########", Token(BYTESTRING, "\\'"));
 }
+
+TEST(RustLexTest, Streams) {
+  TestLex("57 as i64", std::array<Token, 3> {
+      Token(INTEGER, uint64_t(57)),
+      Token(AS),
+      Token(IDENTIFIER, "i64")
+      });
+}

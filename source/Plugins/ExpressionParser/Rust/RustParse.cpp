@@ -505,7 +505,7 @@ RustExpressionUP Parser::Array(Status &error) {
       error.SetErrorString("expected integer literal");
     } else {
       result = llvm::make_unique<RustArrayWithLength>(std::move(expr),
-                                                      CurrentToken().uinteger);
+                                                      CurrentToken().uinteger.getValue());
       Advance();
     }
   } else if (CurrentToken().kind == ',') {
@@ -541,7 +541,7 @@ RustExpressionUP Parser::Field(RustExpressionUP &&lhs, Status &error) {
     Advance();
   } else if (CurrentToken().kind == INTEGER) {
     result = llvm::make_unique<RustTupleFieldExpression>(std::move(lhs),
-                                                         CurrentToken().uinteger);
+                                                         CurrentToken().uinteger.getValue());
     Advance();
   } else {
     error.SetErrorString("identifier or integer expected");
@@ -608,7 +608,7 @@ RustExpressionUP Parser::Term(Status &error) {
     }
     // FIXME error check
     CompilerType type = LookupType(ConstString(suffix));
-    term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger, type);
+    term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), type);
     Advance();
     break;
   }
@@ -620,7 +620,7 @@ RustExpressionUP Parser::Term(Status &error) {
     }
     // FIXME error check
     CompilerType type = LookupType(ConstString(suffix));
-    term = llvm::make_unique<RustLiteral>(CurrentToken().dvalue, type);
+    term = llvm::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(), type);
     Advance();
     break;
   }

@@ -208,7 +208,7 @@ Token Lexer::Number() {
       // Actually a float.
       ::llvm::StringRef sref(number);
       double dval;
-      if (!sref.getAsDouble(dval)) {
+      if (sref.getAsDouble(dval)) {
         return Token(INVALID);
       }
 
@@ -304,7 +304,7 @@ Token Lexer::MaybeByteLiteral() {
 bool Lexer::ParseHex(uint64_t *result, int min_digits, int max_digits) {
   *result = 0;
   int i;
-  for (i = 0; m_iter != m_end && i <= max_digits; ++i, ++m_iter) {
+  for (i = 0; m_iter != m_end && i < max_digits; ++i, ++m_iter) {
     uint64_t digit;
     if (*m_iter >= 'a' && *m_iter <= 'f') {
       digit = *m_iter - 'a' + 10;
@@ -313,7 +313,7 @@ bool Lexer::ParseHex(uint64_t *result, int min_digits, int max_digits) {
     } else if (*m_iter >= '0' && *m_iter <= '9') {
       digit = *m_iter - '0';
     } else {
-      return false;
+      break;
     }
     *result = *result * 16 + digit;
   }
@@ -413,7 +413,7 @@ Token Lexer::Character(bool is_byte) {
     return Token(INVALID);
   }
 
-  return Token(BYTE, result);
+  return Token(is_byte ? BYTE : CHAR, result);
 }
 
 Token Lexer::MaybeRawString(bool is_byte) {
@@ -436,13 +436,13 @@ Token Lexer::MaybeRawString(bool is_byte) {
     return Identifier();
   }
 
-  auto n_hashes = iter - before_hashes;
+  size_t n_hashes = iter - before_hashes;
   ::llvm::StringRef::iterator string_start = ++iter;
 
   for (; iter != m_end; ++iter) {
     if (*iter == '"' &&
         (n_hashes == 0 ||
-         (m_end - iter + 1 > n_hashes &&
+         (size_t(m_end - iter + 1) > n_hashes &&
           strncmp(iter + 1, before_hashes, n_hashes) == 0))) {
       break;
     }
@@ -452,6 +452,11 @@ Token Lexer::MaybeRawString(bool is_byte) {
   if (iter == m_end) {
     return Token(INVALID);
   }
+
+  assert(*m_iter == '"');
+  ++m_iter;
+  assert(Remaining() >= n_hashes);
+  m_iter += n_hashes;
 
   return Token(is_byte ? BYTESTRING : STRING, std::string(string_start, iter));
 }

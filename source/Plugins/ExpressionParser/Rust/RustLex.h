@@ -15,6 +15,7 @@
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-private.h"
 
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace lldb_private {
@@ -68,10 +69,10 @@ enum TokenKind {
 struct Token {
   int kind;
 
-  uint64_t uinteger;
-  double dvalue;
+  llvm::Optional<uint64_t> uinteger;
+  llvm::Optional<double> dvalue;
   // This can be NULL if no suffix was specified.
-  const char *number_suffix;
+  const char *number_suffix = nullptr;
   std::string str;
 
   explicit Token(int kind_)
@@ -95,9 +96,26 @@ struct Token {
 
   Token(int kind_, std::string &&str_)
     : kind(kind_),
-      uinteger(0),
       str(std::move(str_))
   {
+  }
+
+  bool operator==(const Token &other) const {
+    if (kind != other.kind ||
+        uinteger != other.uinteger ||
+        dvalue != other.dvalue ||
+        str != other.str) {
+      return false;
+    }
+
+    if (number_suffix == nullptr) {
+      return other.number_suffix == nullptr;
+    }
+    if (other.number_suffix == nullptr) {
+      return false;
+    }
+
+    return strcmp(number_suffix, other.number_suffix) == 0;
   }
 };
 

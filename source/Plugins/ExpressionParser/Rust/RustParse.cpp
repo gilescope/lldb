@@ -471,7 +471,7 @@ RustExpressionUP Parser::Parens(Status &error) {
   if (CurrentToken().kind == ')') {
     // Unit tuple.
     Advance();
-    return Unimplemented(error);
+    return llvm::make_unique<RustTupleExpression>(std::vector<RustExpressionUP>());
   }
 
   RustExpressionUP expr = Expr(error);
@@ -481,6 +481,7 @@ RustExpressionUP Parser::Parens(Status &error) {
 
   if (CurrentToken().kind == ')') {
     // Parenthesized expression.
+    Advance();
     return expr;
   } else if (CurrentToken().kind != ',') {
     error.SetErrorString("expected ')' or ','");
@@ -491,8 +492,10 @@ RustExpressionUP Parser::Parens(Status &error) {
   exprs.push_back(std::move(expr));
   Advance();
 
-  if (!ExprList(&exprs, error)) {
-    return RustExpressionUP();
+  if (CurrentToken().kind != ')') {
+    if (!ExprList(&exprs, error)) {
+      return RustExpressionUP();
+    }
   }
 
   if (CurrentToken().kind != ')') {
@@ -524,6 +527,7 @@ RustExpressionUP Parser::Array(Status &error) {
       Advance();
     }
   } else if (CurrentToken().kind == ',') {
+    Advance();
     std::vector<RustExpressionUP> exprs;
     exprs.push_back(std::move(expr));
 

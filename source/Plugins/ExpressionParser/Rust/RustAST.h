@@ -17,6 +17,7 @@
 #include "lldb/Core/Scalar.h"
 #include "lldb/Symbol/CompilerType.h"
 #include "lldb/Utility/Stream.h"
+#include "RustLex.h"
 
 namespace lldb_private {
 
@@ -84,7 +85,7 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "[UNARY=" << TAG << "] (" << m_expr << ")";
+    stream << TAG << " (" << m_expr << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
@@ -115,7 +116,9 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "(" << m_left << " [BINARY=" << TAG << "] " << m_right << ")";
+    stream << "(" << m_left << " ";
+    lldb_private::rust::PrintTokenKind(stream, TAG);
+    stream << " " << m_right << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
@@ -139,7 +142,9 @@ class RustAssignExpression : public RustExpression {
 public:
 
   void print(Stream &stream) override {
-    stream << "(" << m_left << " [ASSIGN=" << TAG << "] " << m_right << ")";
+    stream << "(" << m_left << " ";
+    lldb_private::rust::PrintTokenKind(stream, TAG);
+    stream << " " << m_right << ")";
   }
 
   RustAssignExpression(RustExpressionUP &&left,
@@ -356,7 +361,7 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "(";
+    stream << "[";
     bool first = true;
     for (auto &&iter : m_exprs) {
       if (!first) {
@@ -365,7 +370,7 @@ public:
       first = false;
       stream << iter;
     }
-    stream << ")";
+    stream << "]";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -386,7 +391,10 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "[" << m_value << "; " << m_length << "]";
+    stream << "[" << m_value << "; "
+           // Work around Stream weirdness.
+           << int64_t(m_length)
+           << "]";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;

@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "lldb/Utility/Stream.h"
 
 namespace lldb_private {
 
@@ -65,6 +66,8 @@ enum TokenKind {
   INVALID,
   THATSALLFOLKS
 };
+
+void PrintTokenKind(Stream &stream, int kind);
 
 struct Token {
   int kind;

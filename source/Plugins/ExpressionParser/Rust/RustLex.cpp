@@ -16,6 +16,124 @@ using namespace lldb_private;
 using namespace lldb;
 using namespace llvm;
 
+void lldb_private::rust::PrintTokenKind(Stream &stream, int kind) {
+  if (kind < STRING) {
+    stream << char(kind);
+  } else {
+    switch (kind) {
+    case STRING:
+    case BYTESTRING:
+    case CHAR:
+    case BYTE:
+    case FLOAT:
+    case INTEGER:
+    case AS:
+    case TRUE:
+    case FALSE:
+    case SUPER:
+    case SELF:
+    case MUT:
+    case CONST:
+    case FN:
+    case SIZEOF:
+    case IDENTIFIER:
+    case INVALID:
+    case THATSALLFOLKS:
+      // May want to clean this up someday.
+      stream << "[TOKEN=" << kind << "]";
+      break;
+
+    case DOTDOT:
+      stream << "..";
+      break;
+
+    case OROR:
+      stream << "||";
+      break;
+
+    case ANDAND:
+      stream << "&&";
+      break;
+
+    case EQEQ:
+      stream << "==";
+      break;
+
+    case NOTEQ:
+      stream << "!=";
+      break;
+
+    case LTEQ:
+      stream << "<=";
+      break;
+
+    case GTEQ:
+      stream << ">=";
+      break;
+
+    case LSH:
+      stream << "<<";
+      break;
+
+    case RSH:
+      stream << ">>";
+      break;
+
+    case PLUS_EQ:
+      stream << "+=";
+      break;
+
+    case MINUS_EQ:
+      stream << "-=";
+      break;
+
+    case SLASH_EQ:
+      stream << "/=";
+      break;
+
+    case STAR_EQ:
+      stream << "*=";
+      break;
+
+    case PERCENT_EQ:
+      stream << "%=";
+      break;
+
+    case RSH_EQ:
+      stream << ">>=";
+      break;
+
+    case LSH_EQ:
+      stream << "<<=";
+      break;
+
+    case AND_EQ:
+      stream << "&=";
+      break;
+
+    case OR_EQ:
+      stream << "|=";
+      break;
+
+    case XOR_EQ:
+      stream << "^=";
+      break;
+
+    case COLONCOLON:
+      stream << "::";
+      break;
+
+    case ARROW:
+      stream << "->";
+      break;
+
+    default:
+      stream << "!!!OOPS!!!";
+      break;
+    }
+  }
+}
+
 llvm::StringMap<TokenKind> *Lexer::m_keywords;
 
 Token Lexer::Next() {
@@ -67,7 +185,7 @@ Token Lexer::Operator() {
     return Token(result);
   }
 
-  if (strchr(".|&=!<>+-*/%:[](){}", *m_iter) != nullptr) {
+  if (strchr(".,;|&=!<>+-*/%:[](){}", *m_iter) != nullptr) {
     return Token(*m_iter++);
   }
 

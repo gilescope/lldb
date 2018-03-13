@@ -36,7 +36,7 @@ public:
 
 private:
 
-  template<RustUnaryOperator OP> RustExpressionUP Unary(Status &error);
+  template<char C, RustUnaryOperator OP> RustExpressionUP Unary(Status &error);
   bool ExprList(std::vector<RustExpressionUP> *exprs, Status &error);
   RustExpressionUP Parens(Status &error);
   RustExpressionUP Path(Status &error);

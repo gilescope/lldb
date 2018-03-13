@@ -1,7 +1,8 @@
 add_lldb_unittest(RustTests
-  RustLexTest.cpp
+  RustLexTest.cpp RustParseTest.cpp
 
   LINK_LIBS
-    lldbCore
     lldbPluginExpressionParserRust
+    lldbPluginLanguageRuntimeRust
+    lldbCore
   )

@@ -397,6 +397,21 @@ RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error)
   return ValueObjectSP();
 }
 
+Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) {
+  expr->print(stream);
+  return stream;
+}
+
+Stream &lldb_private::operator<< (Stream &stream, const Scalar &value) {
+  value.GetValue(&stream, false);
+  return stream;
+}
+
+Stream &lldb_private::operator<< (Stream &stream, const CompilerType &type) {
+  type.DumpTypeDescription(&stream);
+  return stream;
+}
+
 ////////////////////////////////////////////////////////////////
 // The parser
 
@@ -420,14 +435,14 @@ RustExpressionUP Parser::Unimplemented(Status &error) {
   return RustExpressionUP();
 }
 
-template<RustUnaryOperator OP>
+template<char C, RustUnaryOperator OP>
 RustExpressionUP Parser::Unary(Status &error) {
   Advance();
   RustExpressionUP result = Term(error);
   if (!result) {
     return result;
   }
-  return llvm::make_unique<RustUnaryExpression<OP>>(std::move(result));
+  return llvm::make_unique<RustUnaryExpression<C, OP>>(std::move(result));
 }
 
 bool Parser::ExprList(std::vector<RustExpressionUP> *exprs, Status &error) {
@@ -583,7 +598,8 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustBinaryExpression<ArrayIndex>>(std::move(array), std::move(idx));
+  return llvm::make_unique<RustBinaryExpression<'@', ArrayIndex>>(std::move(array),
+                                                                  std::move(idx));
 }
 
 CompilerType Parser::Type(Status &error) {
@@ -653,16 +669,16 @@ RustExpressionUP Parser::Term(Status &error) {
     return Unimplemented(error);
 
   case '*':
-    term = Unary<UnaryDereference>(error);
+    term = Unary<'*', UnaryDereference>(error);
     break;
   case '+':
-    term = Unary<UnaryPlus>(error);
+    term = Unary<'+', UnaryPlus>(error);
     break;
   case '-':
-    term = Unary<UnaryNegate>(error);
+    term = Unary<'-', UnaryNegate>(error);
     break;
   case '!':
-    term = Unary<UnaryComplement>(error);
+    term = Unary<'!', UnaryComplement>(error);
     break;
 
   case '&':
@@ -727,12 +743,12 @@ RustExpressionUP Parser::Term(Status &error) {
   return term;
 }
 
-#define BINOP(What) \
-  RustBinaryExpression< BinaryOperation< What<Scalar> > >
-#define COMP(What) \
-  RustBinaryExpression< Comparison< What<Scalar> > >
-#define ASSIGN(What) \
-  RustAssignExpression< BinaryOperation< What<Scalar> > >
+#define BINOP(Tag, What)                                        \
+  RustBinaryExpression< Tag, BinaryOperation< What<Scalar> > >
+#define COMP(Tag, What)                                         \
+  RustBinaryExpression< Tag, Comparison< What<Scalar> > >
+#define ASSIGN(Tag, What)                                       \
+  RustAssignExpression< Tag, BinaryOperation< What<Scalar> > >
 
 // Couldn't find these in <functional>.
 
@@ -755,35 +771,35 @@ public:
 
 // Binary operators.  Each line has the form:
 //   DEFINE(token, precedence, type)
-#define BINARY_OPERATORS                        \
-  DEFINE(OROR, 3, RustOrOrExpression)           \
-  DEFINE(ANDAND, 4, RustAndAndExpression)       \
-  DEFINE(EQEQ, 5, COMP(std::equal_to))          \
-  DEFINE(NOTEQ, 5, COMP(std::not_equal_to))     \
-  DEFINE(LTEQ, 5, COMP(std::less_equal))        \
-  DEFINE(GTEQ, 5, COMP(std::greater_equal))     \
-  DEFINE(LSH, 9, BINOP(left_shift))             \
-  DEFINE(RSH, 9, BINOP(right_shift))            \
-  DEFINE(PLUS_EQ, 1, ASSIGN(std::plus))         \
-  DEFINE(MINUS_EQ, 1, ASSIGN(std::minus))       \
-  DEFINE(SLASH_EQ, 1, ASSIGN(std::divides))     \
-  DEFINE(STAR_EQ, 1, ASSIGN(std::multiplies))   \
-  DEFINE(PERCENT_EQ, 1, ASSIGN(std::modulus))   \
-  DEFINE(RSH_EQ, 1, ASSIGN(right_shift))        \
-  DEFINE(LSH_EQ, 1, ASSIGN(left_shift))         \
-  DEFINE(AND_EQ, 1, ASSIGN(std::bit_and))       \
-  DEFINE(OR_EQ, 1, ASSIGN(std::bit_or))         \
-  DEFINE(XOR_EQ, 1, ASSIGN(std::bit_xor))       \
-  DEFINE('|', 6, BINOP(std::bit_or))            \
-  DEFINE('&', 8, BINOP(std::bit_and))           \
-  DEFINE('=', 1, RustAssignment)                \
-  DEFINE('<', 5, COMP(std::less))               \
-  DEFINE('>', 5, COMP(std::greater))            \
-  DEFINE('+', 10, BINOP(std::plus))             \
-  DEFINE('-', 10, BINOP(std::minus))            \
-  DEFINE('*', 11, BINOP(std::multiplies))       \
-  DEFINE('/', 11, BINOP(std::divides))          \
-  DEFINE('%', 11, BINOP(std::modulus))
+#define BINARY_OPERATORS                                        \
+  DEFINE(OROR, 3, RustOrOrExpression)                           \
+  DEFINE(ANDAND, 4, RustAndAndExpression)                       \
+  DEFINE(EQEQ, 5, COMP(EQEQ, std::equal_to))                    \
+  DEFINE(NOTEQ, 5, COMP(NOTEQ, std::not_equal_to))              \
+  DEFINE(LTEQ, 5, COMP(LTEQ, std::less_equal))                  \
+  DEFINE(GTEQ, 5, COMP(GTEQ, std::greater_equal))               \
+  DEFINE(LSH, 9, BINOP(LSH, left_shift))                        \
+  DEFINE(RSH, 9, BINOP(RSH, right_shift))                       \
+  DEFINE(PLUS_EQ, 1, ASSIGN(PLUS_EQ, std::plus))                \
+  DEFINE(MINUS_EQ, 1, ASSIGN(MINUS_EQ, std::minus))             \
+  DEFINE(SLASH_EQ, 1, ASSIGN(SLASH_EQ, std::divides))           \
+  DEFINE(STAR_EQ, 1, ASSIGN(STAR_EQ, std::multiplies))          \
+  DEFINE(PERCENT_EQ, 1, ASSIGN(PERCENT_EQ, std::modulus))       \
+  DEFINE(RSH_EQ, 1, ASSIGN(RSH_EQ, right_shift))                \
+  DEFINE(LSH_EQ, 1, ASSIGN(LSH_EQ, left_shift))                 \
+  DEFINE(AND_EQ, 1, ASSIGN(AND_EQ, std::bit_and))               \
+  DEFINE(OR_EQ, 1, ASSIGN(OR_EQ, std::bit_or))                  \
+  DEFINE(XOR_EQ, 1, ASSIGN(XOR_EQ, std::bit_xor))               \
+  DEFINE('|', 6, BINOP('|', std::bit_or))                       \
+  DEFINE('&', 8, BINOP('&', std::bit_and))                      \
+  DEFINE('=', 1, RustAssignment)                                \
+  DEFINE('<', 5, COMP('<', std::less))                          \
+  DEFINE('>', 5, COMP('>', std::greater))                       \
+  DEFINE('+', 10, BINOP('+', std::plus))                        \
+  DEFINE('-', 10, BINOP('-', std::minus))                       \
+  DEFINE('*', 11, BINOP('*', std::multiplies))                  \
+  DEFINE('/', 11, BINOP('/', std::divides))                     \
+  DEFINE('%', 11, BINOP('%', std::modulus))
 
 RustExpressionUP Parser::Binary(Status &error) {
   struct Operation {

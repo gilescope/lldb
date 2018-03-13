@@ -16,6 +16,7 @@
 #include "lldb/lldb-private.h"
 #include "lldb/Core/Scalar.h"
 #include "lldb/Symbol/CompilerType.h"
+#include "lldb/Utility/Stream.h"
 
 namespace lldb_private {
 
@@ -49,6 +50,13 @@ lldb::ValueObjectSP ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
 
 }
 
+class RustExpression;
+typedef std::unique_ptr<RustExpression> RustExpressionUP;
+
+Stream &operator<< (Stream &stream, const RustExpressionUP &expr);
+Stream &operator<< (Stream &stream, const Scalar &value);
+Stream &operator<< (Stream &stream, const CompilerType &type);
+
 class RustExpression {
 protected:
 
@@ -58,21 +66,25 @@ public:
 
   virtual ~RustExpression() { }
 
+  virtual void print(Stream &stream) = 0;
+
   virtual lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) = 0;
 };
-
-typedef std::unique_ptr<RustExpression> RustExpressionUP;
 
 typedef lldb::ValueObjectSP (*RustUnaryOperator)(ExecutionContext &, lldb::ValueObjectSP,
                                                  Status &error);
 
-template<RustUnaryOperator OP>
+template<char TAG, RustUnaryOperator OP>
 class RustUnaryExpression : public RustExpression {
 public:
 
   explicit RustUnaryExpression(RustExpressionUP &&expr)
     : m_expr(std::move(expr))
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << "[UNARY=" << TAG << "] (" << m_expr << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
@@ -91,7 +103,7 @@ typedef lldb::ValueObjectSP (*RustBinaryOperator)(ExecutionContext &,
                                                   lldb::ValueObjectSP, lldb::ValueObjectSP,
                                                   Status &error);
 
-template<RustBinaryOperator OP>
+template<int TAG, RustBinaryOperator OP>
 class RustBinaryExpression : public RustExpression {
 public:
 
@@ -100,6 +112,10 @@ public:
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << "(" << m_left << " [BINARY=" << TAG << "] " << m_right << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
@@ -118,9 +134,13 @@ private:
   RustExpressionUP m_right;
 };
 
-template<RustBinaryOperator OP>
+template<int TAG, RustBinaryOperator OP>
 class RustAssignExpression : public RustExpression {
 public:
+
+  void print(Stream &stream) override {
+    stream << "(" << m_left << " [ASSIGN=" << TAG << "] " << m_right << ")";
+  }
 
   RustAssignExpression(RustExpressionUP &&left,
 		       RustExpressionUP &&right)
@@ -156,6 +176,10 @@ public:
   {
   }
 
+  void print(Stream &stream) override {
+    stream << "(" << m_left << " = " << m_right << ")";
+  }
+
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
     error.SetErrorString("assignment unimplemented");
     return lldb::ValueObjectSP();
@@ -177,6 +201,10 @@ public:
   {
   }
 
+  void print(Stream &stream) override {
+    stream << "(" << m_left << " && " << m_right << ")";
+  }
+
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
@@ -193,6 +221,10 @@ public:
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << "(" << m_left << " || " << m_right << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -214,6 +246,10 @@ public:
   {
   }
 
+  void print(Stream &stream) override {
+    stream << "(" << m_left << " .. " << m_right << ")";
+  }
+
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
@@ -229,6 +265,10 @@ public:
     : m_left(std::move(left)),
       m_field(field.str())
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << m_left << "." << m_field;
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -252,6 +292,10 @@ public:
 
 private:
 
+  void print(Stream &stream) override {
+    stream << m_left << "." << m_field;
+  }
+
   RustExpressionUP m_left;
   uint32_t m_field;
 };
@@ -263,6 +307,10 @@ public:
     : m_value(value),
       m_type(type)
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << m_value;
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -281,6 +329,16 @@ public:
   {
   }
 
+  void print(Stream &stream) override {
+    stream << "(";
+    for (auto &&iter : m_exprs) {
+      // We want a trailing "," in one case, so just leave it in
+      // always.
+      stream << iter << ", ";
+    }
+    stream << ")";
+  }
+
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
@@ -295,6 +353,19 @@ public:
   explicit RustArrayLiteral(std::vector<RustExpressionUP> &&exprs)
     : m_exprs(std::move(exprs))
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << "(";
+    bool first = true;
+    for (auto &&iter : m_exprs) {
+      if (!first) {
+        stream << ", ";
+      }
+      first = false;
+      stream << iter;
+    }
+    stream << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -314,6 +385,10 @@ public:
   {
   }
 
+  void print(Stream &stream) override {
+    stream << "[" << m_value << "; " << m_length << "]";
+  }
+
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
@@ -329,6 +404,19 @@ public:
     : m_func(std::move(func)),
       m_exprs(std::move(exprs))
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << m_func << " (";
+    bool first = true;
+    for (auto &&iter : m_exprs) {
+      if (!first) {
+        stream << ", ";
+      }
+      first = false;
+      stream << iter;
+    }
+    stream << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -347,6 +435,10 @@ public:
     : m_type(type),
       m_expr(std::move(expr))
   {
+  }
+
+  void print(Stream &stream) override {
+    stream << "(" << m_expr << " as " << m_type << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;

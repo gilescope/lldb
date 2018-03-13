@@ -71,6 +71,8 @@ add_lldb_library(lldbCore
     lldbPluginCPlusPlusLanguage
     lldbPluginObjCLanguage
     lldbPluginObjectFileJIT
+    lldbPluginExpressionParserRust
+    lldbPluginLanguageRuntimeRust
     ${LLDB_CURSES_LIBS}
 
   LINK_COMPONENTS

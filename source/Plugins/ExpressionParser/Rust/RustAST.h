@@ -326,6 +326,7 @@ private:
   CompilerType m_type;
 };
 
+// FIXME maybe this should just be RustLiteral with the correct type.
 class RustBooleanLiteral : public RustExpression {
 public:
 
@@ -343,6 +344,41 @@ public:
 private:
 
   bool m_value;
+};
+
+// FIXME maybe this should just be RustLiteral with the correct type.
+class RustCharLiteral : public RustExpression {
+public:
+
+  RustCharLiteral(uint32_t value, bool is_byte)
+    : m_value(value),
+      m_is_byte(is_byte)
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << (m_is_byte ? "b'" : "'");
+    if (m_value >= ' ' && m_value < 128) {
+      stream << char(m_value);
+    } else {
+      if (m_is_byte) {
+        stream << "\\x";
+        stream.PutHex8(m_value);
+      } else {
+        stream << "\\u{";
+        stream.PutHex32(m_value);
+        stream << "}";
+      }
+    }
+    stream << "'";
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  uint32_t m_value;
+  bool m_is_byte;
 };
 
 class RustStringLiteral : public RustExpression {

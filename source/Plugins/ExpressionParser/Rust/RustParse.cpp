@@ -285,6 +285,14 @@ RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
+RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
+{
+  // FIXME.
+  error.SetErrorString("Unimplemented");
+  return ValueObjectSP();
+}
+
+lldb::ValueObjectSP
 RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
@@ -598,8 +606,10 @@ RustExpressionUP Parser::Call(RustExpressionUP &&func, Status &error) {
   Advance();
 
   std::vector<RustExpressionUP> exprs;
-  if (!ExprList(&exprs, error)) {
-    return RustExpressionUP();
+  if (CurrentToken().kind != ')') {
+    if (!ExprList(&exprs, error)) {
+      return RustExpressionUP();
+    }
   }
 
   if (CurrentToken().kind != ')') {
@@ -637,7 +647,57 @@ CompilerType Parser::Type(Status &error) {
 }
 
 RustExpressionUP Parser::Path(Status &error) {
-  return Unimplemented(error);
+  bool relative = true;
+  int supers = 0;
+
+  bool saw_self = CurrentToken().kind == SELF;
+  if (saw_self) {
+    Advance();
+    if (CurrentToken().kind != COLONCOLON) {
+      std::vector<std::string> path;
+      path.emplace_back("self");
+      return llvm::make_unique<RustPathExpression>(true, 0, std::move(path));
+    }
+  }
+
+  if (CurrentToken().kind == COLONCOLON) {
+    if (!saw_self) {
+      relative = false;
+    }
+    Advance();
+  }
+
+  if (relative) {
+    while (CurrentToken().kind == SUPER) {
+      ++supers;
+      Advance();
+      if (CurrentToken().kind != COLONCOLON) {
+        error.SetErrorString("'::' expected after 'super'");
+        return RustExpressionUP();
+      }
+      Advance();
+    }
+  }
+
+  std::vector<std::string> path;
+  while (CurrentToken().kind == IDENTIFIER) {
+    path.emplace_back(std::move(CurrentToken().str));
+    Advance();
+    if (CurrentToken().kind != COLONCOLON) {
+      break;
+    }
+    Advance();
+  }
+
+  // FIXME should handle :: < type-list > near here.
+  // also don't forget that this could end with a ">>" token
+
+  if (path.empty()) {
+    error.SetErrorString("identifier expected");
+    return RustExpressionUP();
+  }
+
+  return llvm::make_unique<RustPathExpression>(relative, supers, std::move(path));
 }
 
 RustExpressionUP Parser::Term(Status &error) {

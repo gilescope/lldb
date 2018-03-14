@@ -66,14 +66,23 @@ TEST(RustParseTest, Simple) {
   TestParse("[1,2,3][5]", "([1, 2, 3] @ 5)");
 }
 
-// TEST(RustParseTest, Members) {
-//   TestParse("something.57", "something.57");
-//   TestParse("something.field", "something.field");
-// }
+TEST(RustParseTest, Members) {
+  TestParse("something.57", "something.57");
+  TestParse("something.field", "something.field");
+}
 
 TEST(RustParseTest, Calls) {
-  // TestParse("func()", "func ()");
-  // TestParse("func(1,2,'b')", "func (1, 2, 'b')");
-  // TestParse("s.f(7)", "s.f (7)");
+  TestParse("func()", "func ()");
+  TestParse("func(1,2,'b')", "func (1, 2, 'b')");
+  TestParse("s.f(7)", "s.f (7)");
   TestParse("23.mumble(8)", "23.mumble (8)");
+}
+
+TEST(RustParseTest, Paths) {
+  TestParse("self", "self");
+  TestParse("self::super::hi", "super::hi");
+  TestParse("self::hi::there", "hi::there");
+  TestParse("self::super::super::super::hi", "super::super::super::hi");
+  TestParse("::hi::there", "::hi::there");
+  TestParse("hi::there", "hi::there");
 }

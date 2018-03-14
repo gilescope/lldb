@@ -298,7 +298,7 @@ public:
 private:
 
   void print(Stream &stream) override {
-    stream << m_left << "." << m_field;
+    stream << m_left << "." << int(m_field);
   }
 
   RustExpressionUP m_left;
@@ -531,6 +531,43 @@ private:
 
   CompilerType m_type;
   RustExpressionUP m_expr;
+};
+
+class RustPathExpression : public RustExpression {
+public:
+
+  // FIXME should the parser just be finding the symbol?
+  RustPathExpression(bool relative, int supers, std::vector<std::string> &&path)
+    : m_relative(relative),
+      m_supers(supers),
+      m_path(std::move(path))
+  {
+  }
+
+  void print(Stream &stream) override {
+    if (!m_relative) {
+      stream << "::";
+    }
+    for (int i = 0; i < m_supers; ++i) {
+      stream << "super::";
+    }
+    bool first = true;
+    for (const std::string &str : m_path) {
+      if (!first) {
+        stream << "::";
+      }
+      first = false;
+      stream << str;
+    }
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  bool m_relative;
+  int m_supers;
+  std::vector<std::string> m_path;
 };
 
 } // namespace lldb_private

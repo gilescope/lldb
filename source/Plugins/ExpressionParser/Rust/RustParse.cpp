@@ -269,6 +269,14 @@ RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
+RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
+{
+  // FIXME.
+  error.SetErrorString("Unimplemented");
+  return ValueObjectSP();
+}
+
+lldb::ValueObjectSP
 RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
@@ -655,7 +663,10 @@ RustExpressionUP Parser::Term(Status &error) {
 
   case STRING:
   case BYTESTRING:
-    return Unimplemented(error);
+    term = llvm::make_unique<RustStringLiteral>(std::move(CurrentToken().str),
+                                                CurrentToken().kind == BYTESTRING);
+    Advance();
+    break;
 
   case TRUE:
   case FALSE:

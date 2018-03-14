@@ -46,6 +46,11 @@ TEST(RustParseTest, Literals) {
   TestParse("(1,)", "(1, )");
   TestParse("(1,2,3)", "(1, 2, 3, )");
   TestParse("true || false", "(true || false)");
+
+  TestParse("\"hi\"", "\"hi\"");
+  TestParse("b\"hi\"", "b\"hi\"");
+  TestParse("r##\"hi\"##", "\"hi\"");
+  TestParse("br##\"hi\"##", "b\"hi\"");
 }
 
 TEST(RustParseTest, Simple) {

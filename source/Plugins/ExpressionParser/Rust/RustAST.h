@@ -345,6 +345,27 @@ private:
   bool m_value;
 };
 
+class RustStringLiteral : public RustExpression {
+public:
+
+  RustStringLiteral(std::string &&value, bool is_byte)
+    : m_value(std::move(value)),
+      m_is_byte(is_byte)
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << (m_is_byte ? "b\"" : "\"") << m_value << "\"";
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  std::string m_value;
+  bool m_is_byte;
+};
+
 class RustTupleExpression : public RustExpression {
 public:
 

@@ -45,6 +45,7 @@ TEST(RustParseTest, Literals) {
   TestParse("()", "()");
   TestParse("(1,)", "(1, )");
   TestParse("(1,2,3)", "(1, 2, 3, )");
+  TestParse("true || false", "(true || false)");
 }
 
 TEST(RustParseTest, Simple) {

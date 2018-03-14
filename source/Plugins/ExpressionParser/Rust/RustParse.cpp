@@ -261,6 +261,14 @@ RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
+RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
+{
+  // FIXME.
+  error.SetErrorString("Unimplemented");
+  return ValueObjectSP();
+}
+
+lldb::ValueObjectSP
 RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
@@ -650,9 +658,10 @@ RustExpressionUP Parser::Term(Status &error) {
     return Unimplemented(error);
 
   case TRUE:
-    return Unimplemented(error);
   case FALSE:
-    return Unimplemented(error);
+    term = llvm::make_unique<RustBooleanLiteral>(CurrentToken().kind == TRUE);
+    Advance();
+    break;
 
   case '[':
     term = Array(error);

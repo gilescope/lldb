@@ -326,6 +326,25 @@ private:
   CompilerType m_type;
 };
 
+class RustBooleanLiteral : public RustExpression {
+public:
+
+  RustBooleanLiteral(bool value)
+    : m_value(value)
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << (m_value ? "true" : "false");
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  bool m_value;
+};
+
 class RustTupleExpression : public RustExpression {
 public:
 

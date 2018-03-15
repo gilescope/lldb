@@ -54,9 +54,25 @@ lldb::ValueObjectSP ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
 class RustExpression;
 typedef std::unique_ptr<RustExpression> RustExpressionUP;
 
+class RustTypeExpression;
+typedef std::unique_ptr<RustTypeExpression> RustTypeExpressionUP;
+
 Stream &operator<< (Stream &stream, const RustExpressionUP &expr);
+Stream &operator<< (Stream &stream, const RustTypeExpressionUP &type);
 Stream &operator<< (Stream &stream, const Scalar &value);
-Stream &operator<< (Stream &stream, const CompilerType &type);
+
+template<typename T>
+Stream &operator<< (Stream &stream, const std::vector<T> &items) {
+  bool first = true;
+  for (const T &item : items) {
+    if (!first) {
+      stream << ", ";
+    }
+    first = false;
+    stream << item;
+  }
+  return stream;
+}
 
 class RustExpression {
 protected:
@@ -308,9 +324,9 @@ private:
 class RustLiteral : public RustExpression {
 public:
 
-  RustLiteral(Scalar value, CompilerType type)
+  RustLiteral(Scalar value, RustTypeExpressionUP &&type)
     : m_value(value),
-      m_type(type)
+      m_type(std::move(type))
   {
   }
 
@@ -323,7 +339,7 @@ public:
 private:
 
   Scalar m_value;
-  CompilerType m_type;
+  RustTypeExpressionUP m_type;
 };
 
 // FIXME maybe this should just be RustLiteral with the correct type.
@@ -411,13 +427,8 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "(";
-    for (auto &&iter : m_exprs) {
-      // We want a trailing "," in one case, so just leave it in
-      // always.
-      stream << iter << ", ";
-    }
-    stream << ")";
+    // Maybe emit an extra "," to differentiate from (expr).
+    stream << "(" << m_exprs << (m_exprs.empty() ? "" : ", ") << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -437,16 +448,7 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "[";
-    bool first = true;
-    for (auto &&iter : m_exprs) {
-      if (!first) {
-        stream << ", ";
-      }
-      first = false;
-      stream << iter;
-    }
-    stream << "]";
+    stream << "[" << m_exprs << "]";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -491,16 +493,7 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << m_func << " (";
-    bool first = true;
-    for (auto &&iter : m_exprs) {
-      if (!first) {
-        stream << ", ";
-      }
-      first = false;
-      stream << iter;
-    }
-    stream << ")";
+    stream << m_func << " (" << m_exprs << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -515,8 +508,8 @@ private:
 class RustCast : public RustExpression {
 public:
 
-  RustCast(CompilerType type, RustExpressionUP &&expr)
-    : m_type(type),
+  RustCast(RustTypeExpressionUP &&type, RustExpressionUP &&expr)
+    : m_type(std::move(type)),
       m_expr(std::move(expr))
   {
   }
@@ -529,18 +522,19 @@ public:
 
 private:
 
-  CompilerType m_type;
+  RustTypeExpressionUP m_type;
   RustExpressionUP m_expr;
 };
 
 class RustPathExpression : public RustExpression {
 public:
 
-  // FIXME should the parser just be finding the symbol?
-  RustPathExpression(bool relative, int supers, std::vector<std::string> &&path)
+  RustPathExpression(bool relative, int supers, std::vector<std::string> &&path,
+                     std::vector<RustTypeExpressionUP> &&generic_params)
     : m_relative(relative),
       m_supers(supers),
-      m_path(std::move(path))
+      m_path(std::move(path)),
+      m_generic_params(std::move(generic_params))
   {
   }
 
@@ -559,6 +553,9 @@ public:
       first = false;
       stream << str;
     }
+    if (!m_generic_params.empty()) {
+      stream << "::<" << m_generic_params << ">";
+    }
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -568,6 +565,192 @@ private:
   bool m_relative;
   int m_supers;
   std::vector<std::string> m_path;
+  std::vector<RustTypeExpressionUP> m_generic_params;
+};
+
+
+class RustTypeExpression {
+protected:
+
+  RustTypeExpression() { }
+
+public:
+
+  virtual ~RustTypeExpression() { }
+
+  virtual void print(Stream &stream) = 0;
+
+  virtual CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) = 0;
+};
+
+class RustPathTypeExpression : public RustTypeExpression {
+public:
+
+  RustPathTypeExpression(bool relative, int supers, std::vector<std::string> &&path,
+                         std::vector<RustTypeExpressionUP> &&generic_params)
+    : m_relative(relative),
+      m_supers(supers),
+      m_path(std::move(path)),
+      m_generic_params(std::move(generic_params))
+  {
+  }
+
+  explicit RustPathTypeExpression(std::string &&item)
+    : m_relative(true),
+      m_supers(0)
+  {
+    m_path.push_back(std::move(item));
+  }
+
+  void print(Stream &stream) override {
+    if (!m_relative) {
+      stream << "::";
+    }
+    for (int i = 0; i < m_supers; ++i) {
+      stream << "super::";
+    }
+    bool first = true;
+    for (const std::string &str : m_path) {
+      if (!first) {
+        stream << "::";
+      }
+      first = false;
+      stream << str;
+    }
+
+    if (!m_generic_params.empty()) {
+      stream << "<" << m_generic_params << ">";
+    }
+  }
+
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return CompilerType();
+  }
+
+private:
+
+  bool m_relative;
+  int m_supers;
+  std::vector<std::string> m_path;
+  std::vector<RustTypeExpressionUP> m_generic_params;
+};
+
+class RustArrayTypeExpression : public RustTypeExpression {
+public:
+
+  RustArrayTypeExpression(RustTypeExpressionUP &&element, uint64_t len)
+    : m_element(std::move(element)),
+      m_len(len)
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << "[" << m_element << "; " << int64_t(m_len) << "]";
+  }
+
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return CompilerType();
+  }
+
+private:
+
+  RustTypeExpressionUP m_element;
+  uint64_t m_len;
+};
+
+class RustSliceTypeExpression : public RustTypeExpression {
+public:
+
+  RustSliceTypeExpression(RustTypeExpressionUP &&element)
+    : m_element(std::move(element))
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << "&[" << m_element << "]";
+  }
+
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return CompilerType();
+  }
+
+private:
+
+  RustTypeExpressionUP m_element;
+};
+
+class RustPointerTypeExpression : public RustTypeExpression {
+public:
+
+  RustPointerTypeExpression(RustTypeExpressionUP &&target, bool is_ref, bool is_mut = false)
+    : m_target(std::move(target)),
+      m_is_ref(is_ref),
+      m_is_mut(is_mut)
+  {
+  }
+
+  void print(Stream &stream) override {
+    if (m_is_ref) {
+      stream << "&" << m_target;
+    } else {
+      stream << "*" << (m_is_mut ? "mut " : "const ") << m_target;
+    }
+  }
+
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return CompilerType();
+  }
+
+private:
+
+  RustTypeExpressionUP m_target;
+  bool m_is_ref;
+  bool m_is_mut;
+};
+
+class RustFunctionTypeExpression : public RustTypeExpression {
+public:
+
+  RustFunctionTypeExpression(RustTypeExpressionUP &&result,
+                             std::vector<RustTypeExpressionUP> &&arguments)
+    : m_result(std::move(result)),
+      m_arguments(std::move(arguments))
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << "fn (" << m_arguments << ") -> " << m_result;
+  }
+
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return CompilerType();
+  }
+
+private:
+
+  RustTypeExpressionUP m_result;
+  std::vector<RustTypeExpressionUP> m_arguments;
+};
+
+class RustTupleTypeExpression : public RustTypeExpression {
+public:
+
+  RustTupleTypeExpression(std::vector<RustTypeExpressionUP> &&arguments)
+    : m_arguments(std::move(arguments))
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << "(" << m_arguments << ")";
+  }
+
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return CompilerType();
+  }
+
+private:
+
+  std::vector<RustTypeExpressionUP> m_arguments;
 };
 
 } // namespace lldb_private

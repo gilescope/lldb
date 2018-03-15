@@ -23,14 +23,19 @@ using namespace lldb;
 using namespace llvm;
 
 static RustASTContext *
-GetASTContext(ValueObjectSP val, Status &error)
+GetASTContext(const CompilerType &type, Status &error)
 {
-  RustASTContext *result =
-    llvm::dyn_cast_or_null<RustASTContext>(val->GetCompilerType().GetTypeSystem());
+  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
   return result;
+}
+
+static RustASTContext *
+GetASTContext(ValueObjectSP val, Status &error)
+{
+  return GetASTContext(val->GetCompilerType(), error);
 }
 
 static ValueObjectSP
@@ -257,7 +262,11 @@ lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
 lldb::ValueObjectSP
 RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
-  return CreateValueFromScalar(exe_ctx, m_value, m_type, error);
+  CompilerType type = m_type->Evaluate(exe_ctx, error);
+  if (!type) {
+    return ValueObjectSP();
+  }
+  return CreateValueFromScalar(exe_ctx, m_value, type, error);
 }
 
 lldb::ValueObjectSP
@@ -434,32 +443,18 @@ Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) 
   return stream;
 }
 
+Stream &lldb_private::operator<< (Stream &stream, const RustTypeExpressionUP &type) {
+  type->print(stream);
+  return stream;
+}
+
 Stream &lldb_private::operator<< (Stream &stream, const Scalar &value) {
   value.GetValue(&stream, false);
   return stream;
 }
 
-Stream &lldb_private::operator<< (Stream &stream, const CompilerType &type) {
-  type.DumpTypeDescription(&stream);
-  return stream;
-}
-
 ////////////////////////////////////////////////////////////////
 // The parser
-
-CompilerType Parser::LookupType(ConstString name) {
-  if (!m_target)
-    return CompilerType();
-  SymbolContext sc;
-  TypeList type_list;
-  llvm::DenseSet<SymbolFile *> searched_symbol_files;
-  uint32_t num_matches = m_target->GetImages().FindTypes(
-      sc, name, false, 2, searched_symbol_files, type_list);
-  if (num_matches > 0) {
-    return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
-  }
-  return CompilerType();
-}
 
 // temporary
 RustExpressionUP Parser::Unimplemented(Status &error) {
@@ -640,12 +635,6 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
                                                                   std::move(idx));
 }
 
-CompilerType Parser::Type(Status &error) {
-  // FIXME
-  error.SetErrorString("type parsing unimplemented");
-  return CompilerType();
-}
-
 RustExpressionUP Parser::Path(Status &error) {
   bool relative = true;
   int supers = 0;
@@ -656,7 +645,8 @@ RustExpressionUP Parser::Path(Status &error) {
     if (CurrentToken().kind != COLONCOLON) {
       std::vector<std::string> path;
       path.emplace_back("self");
-      return llvm::make_unique<RustPathExpression>(true, 0, std::move(path));
+      return llvm::make_unique<RustPathExpression>(true, 0, std::move(path),
+                                                   std::vector<RustTypeExpressionUP> ());
     }
   }
 
@@ -687,17 +677,26 @@ RustExpressionUP Parser::Path(Status &error) {
       break;
     }
     Advance();
+    if (CurrentToken().kind != IDENTIFIER && CurrentToken().kind != '<') {
+      error.SetErrorString("identifier or '<' expected");
+      return RustExpressionUP();
+    }
   }
 
-  // FIXME should handle :: < type-list > near here.
-  // also don't forget that this could end with a ">>" token
+  std::vector<RustTypeExpressionUP> type_list;
+  if (CurrentToken().kind == '<') {
+    if (!BracketTypeList(&type_list, error)) {
+      return RustExpressionUP();
+    }
+  }
 
   if (path.empty()) {
     error.SetErrorString("identifier expected");
     return RustExpressionUP();
   }
 
-  return llvm::make_unique<RustPathExpression>(relative, supers, std::move(path));
+  return llvm::make_unique<RustPathExpression>(relative, supers, std::move(path),
+                                               std::move(type_list));
 }
 
 RustExpressionUP Parser::Term(Status &error) {
@@ -710,9 +709,8 @@ RustExpressionUP Parser::Term(Status &error) {
       // FIXME
       suffix = "i64";
     }
-    // FIXME error check
-    CompilerType type = LookupType(ConstString(suffix));
-    term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), type);
+    RustTypeExpressionUP type = llvm::make_unique<RustPathTypeExpression>(suffix);
+    term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), std::move(type));
     Advance();
     break;
   }
@@ -722,9 +720,8 @@ RustExpressionUP Parser::Term(Status &error) {
     if (!suffix) {
       suffix = "f64";
     }
-    // FIXME error check
-    CompilerType type = LookupType(ConstString(suffix));
-    term = llvm::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(), type);
+    RustTypeExpressionUP type = llvm::make_unique<RustPathTypeExpression>(suffix);
+    term = llvm::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(), std::move(type));
     Advance();
     break;
   }
@@ -804,11 +801,11 @@ RustExpressionUP Parser::Term(Status &error) {
     switch (CurrentToken().kind) {
     case AS: {
       Advance();
-      CompilerType type = Type(error);
+      RustTypeExpressionUP type = Type(error);
       if (!type) {
         return RustExpressionUP();
       }
-      term = llvm::make_unique<RustCast>(type, std::move(term));
+      term = llvm::make_unique<RustCast>(std::move(type), std::move(term));
       break;
     }
 
@@ -984,4 +981,279 @@ RustExpressionUP Parser::Binary(Status &error) {
 
   assert(operations.size() == 1);
   return std::move(operations.back().term);
+}
+
+////////////////////////////////////////////////////////////////
+// Type parsing
+
+RustTypeExpressionUP Parser::ArrayType(Status &error) {
+  assert(CurrentToken().kind == '[');
+  Advance();
+
+  RustTypeExpressionUP element = Type(error);
+  if (!element) {
+    return element;
+  }
+
+  if (CurrentToken().kind != ';') {
+    error.SetErrorString("';' expected");
+    return RustTypeExpressionUP();
+  }
+  Advance();
+
+  if (CurrentToken().kind != INTEGER) {
+    error.SetErrorString("integer expected");
+    return RustTypeExpressionUP();
+  }
+
+  uint64_t len = CurrentToken().uinteger.getValue();
+  Advance();
+
+  if (CurrentToken().kind != ']') {
+    error.SetErrorString("']' expected");
+    return RustTypeExpressionUP();
+  }
+  Advance();
+
+  return llvm::make_unique<RustArrayTypeExpression>(std::move(element), len);
+}
+
+RustTypeExpressionUP Parser::ReferenceType(Status &error) {
+  assert(CurrentToken().kind == '&');
+  Advance();
+
+  bool is_slice = false;
+  if (CurrentToken().kind == '[') {
+    is_slice = true;
+    Advance();
+  }
+
+  RustTypeExpressionUP target = Type(error);
+  if (!target) {
+    return target;
+  }
+
+  if (is_slice) {
+    if (CurrentToken().kind != ']') {
+      error.SetErrorString("']' expected");
+      return RustTypeExpressionUP();
+    }
+    Advance();
+
+    return llvm::make_unique<RustSliceTypeExpression>(std::move(target));
+  }
+
+  return llvm::make_unique<RustPointerTypeExpression>(std::move(target), true);
+}
+
+RustTypeExpressionUP Parser::PointerType(Status &error) {
+  assert(CurrentToken().kind == '*');
+  Advance();
+
+  bool is_mut = false;
+  if (CurrentToken().kind == MUT) {
+    is_mut = true;
+  } else if (CurrentToken().kind != CONST) {
+    error.SetErrorString("expected 'mut' or 'const'");
+    return RustTypeExpressionUP();
+  }
+  Advance();
+
+  RustTypeExpressionUP target = Type(error);
+  if (!target) {
+    return target;
+  }
+
+  return llvm::make_unique<RustPointerTypeExpression>(std::move(target), false, is_mut);
+}
+
+bool Parser::TypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
+  while (true) {
+    RustTypeExpressionUP t = Type(error);
+    if (!t) {
+      return false;
+    }
+    type_list->push_back(std::move(t));
+    if (CurrentToken().kind != ',') {
+      break;
+    }
+    Advance();
+  }
+
+  return true;
+}
+
+bool Parser::ParenTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
+  if (CurrentToken().kind != '(') {
+    error.SetErrorStringWithFormat("'(' expected");
+    return false;
+  }
+  Advance();
+
+  if (CurrentToken().kind != ')') {
+    if (!TypeList(type_list, error)) {
+      return false;
+    }
+  }
+
+  if (CurrentToken().kind != ')') {
+    error.SetErrorStringWithFormat("')' expected");
+    return false;
+  }
+  Advance();
+
+  return true;
+}
+
+bool Parser::BracketTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
+  if (CurrentToken().kind != '<') {
+    error.SetErrorStringWithFormat("'<' expected");
+    return false;
+  }
+  Advance();
+
+  if (CurrentToken().kind != '>' && CurrentToken().kind != RSH) {
+    if (!TypeList(type_list, error)) {
+      return false;
+    }
+  }
+
+  if (CurrentToken().kind == RSH) {
+    ReplaceTokenKind('>');
+  } else if (CurrentToken().kind != '>') {
+    error.SetErrorStringWithFormat("'>' expected");
+    return false;
+  } else {
+    Advance();
+  }
+
+  return true;
+}
+
+RustTypeExpressionUP Parser::FunctionType(Status &error) {
+  assert(CurrentToken().kind == FN);
+  Advance();
+
+  std::vector<RustTypeExpressionUP> type_list;
+  if (!ParenTypeList(&type_list, error)) {
+    return RustTypeExpressionUP();
+  }
+
+  if (CurrentToken().kind != ARROW) {
+    error.SetErrorString("'->' expected");
+    return RustTypeExpressionUP();
+  }
+  Advance();
+
+  RustTypeExpressionUP return_type = Type(error);
+  if (!return_type) {
+    return return_type;
+  }
+
+  return llvm::make_unique<RustFunctionTypeExpression>(std::move(return_type),
+                                                       std::move(type_list));
+}
+
+RustTypeExpressionUP Parser::TupleType(Status &error) {
+  assert(CurrentToken().kind == '(');
+  // Don't advance here, ParenTypeList is going to deal with the open
+  // paren.
+
+  std::vector<RustTypeExpressionUP> type_list;
+  if (!ParenTypeList(&type_list, error)) {
+    return RustTypeExpressionUP();
+  }
+
+  return llvm::make_unique<RustTupleTypeExpression>(std::move(type_list));
+}
+
+RustTypeExpressionUP Parser::TypePath(Status &error) {
+  bool relative = true;
+  int supers = 0;
+
+  bool saw_self = CurrentToken().kind == SELF;
+  if (saw_self) {
+    Advance();
+    if (CurrentToken().kind != COLONCOLON) {
+      error.SetErrorString("'::' expected");
+      return RustTypeExpressionUP();
+    }
+  }
+
+  if (CurrentToken().kind == COLONCOLON) {
+    if (!saw_self) {
+      relative = false;
+    }
+    Advance();
+  }
+
+  if (relative) {
+    while (CurrentToken().kind == SUPER) {
+      ++supers;
+      Advance();
+      if (CurrentToken().kind != COLONCOLON) {
+        error.SetErrorString("'::' expected after 'super'");
+        return RustTypeExpressionUP();
+      }
+      Advance();
+    }
+  }
+
+  std::vector<std::string> path;
+  while (CurrentToken().kind == IDENTIFIER) {
+    path.emplace_back(std::move(CurrentToken().str));
+    Advance();
+    if (CurrentToken().kind != COLONCOLON) {
+      break;
+    }
+    Advance();
+    if (CurrentToken().kind != IDENTIFIER && CurrentToken().kind != '<') {
+      error.SetErrorString("identifier or '<' expected");
+      return RustTypeExpressionUP();
+    }
+  }
+
+  std::vector<RustTypeExpressionUP> type_list;
+  if (CurrentToken().kind == '<') {
+    if (!BracketTypeList(&type_list, error)) {
+      return RustTypeExpressionUP();
+    }
+  }
+
+  if (path.empty()) {
+    error.SetErrorString("identifier expected");
+    return RustTypeExpressionUP();
+  }
+
+  return llvm::make_unique<RustPathTypeExpression>(relative, supers, std::move(path),
+                                                   std::move(type_list));
+}
+
+RustTypeExpressionUP Parser::Type(Status &error) {
+  switch (CurrentToken().kind) {
+  case '[':
+    return ArrayType(error);
+
+  case '&':
+    return ReferenceType(error);
+
+  case '*':
+    return PointerType(error);
+
+  case FN:
+    return FunctionType(error);
+
+  case '(':
+    return TupleType(error);
+
+  case SUPER:
+  case SELF:
+  case IDENTIFIER:
+  case COLONCOLON:
+    return TypePath(error);
+
+  default:
+    error.SetErrorString("expected type");
+    return RustTypeExpressionUP();
+  }
 }

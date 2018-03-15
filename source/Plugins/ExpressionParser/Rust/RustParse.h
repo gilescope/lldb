@@ -46,11 +46,24 @@ private:
   RustExpressionUP Index(RustExpressionUP &&array, Status &error);
   RustExpressionUP Term(Status &error);
   RustExpressionUP Binary(Status &error);
-  CompilerType Type(Status &error);
-  CompilerType LookupType(ConstString name);
+  RustTypeExpressionUP Type(Status &error);
+
+  RustTypeExpressionUP ArrayType(Status &error);
+  RustTypeExpressionUP ReferenceType(Status &error);
+  RustTypeExpressionUP PointerType(Status &error);
+  bool TypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error);
+  bool ParenTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error);
+  bool BracketTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error);
+  RustTypeExpressionUP FunctionType(Status &error);
+  RustTypeExpressionUP TupleType(Status &error);
+  RustTypeExpressionUP TypePath(Status &error);
 
   Token &CurrentToken() { return m_current; }
   void Advance() { m_current = m_lexer.Next(); }
+
+  // There's one case where we need to push-back, but we don't need
+  // full generality so there's just this little hack.
+  void ReplaceTokenKind(int k) { m_current.kind = k; }
 
   RustExpressionUP Unimplemented(Status &error);
 

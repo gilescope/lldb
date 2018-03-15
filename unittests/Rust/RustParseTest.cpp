@@ -24,15 +24,18 @@ TestParse(const char *input, const char *expected) {
   RustExpressionUP result = parser.Expr(error);
 
   if (expected == nullptr) {
-    EXPECT_EQ(result.get(), nullptr) << "expected failure for " << input;
+    EXPECT_EQ(result.get(), nullptr) << "expected failure for "
+                                     << input << ": " << error.AsCString();
     EXPECT_NE(error.AsCString(nullptr), nullptr) << "expected error message for " << input;
   } else {
-    ASSERT_NE(result.get(), nullptr) << "unexpected parse failure for " << input;
+    ASSERT_NE(result.get(), nullptr) << "unexpected parse failure for "
+                                     << input << ": " << error.AsCString();
 
     StreamString str;
     str << result;
 
-    EXPECT_STREQ(str.GetData(), expected) << "incorrect parse for " << input;
+    EXPECT_STREQ(str.GetData(), expected) << "incorrect parse for "
+                                          << input << ": " << error.AsCString();
   }
 }
 
@@ -85,4 +88,15 @@ TEST(RustParseTest, Paths) {
   TestParse("self::super::super::super::hi", "super::super::super::hi");
   TestParse("::hi::there", "::hi::there");
   TestParse("hi::there", "hi::there");
+  TestParse("hi::there::<bool>", "hi::there::<bool>");
+  TestParse("hi::there::<something<bool>>", "hi::there::<something<bool>>");
+}
+
+TEST(RustParseTest, Types) {
+  TestParse("32 as usize", "(32 as usize)");
+  TestParse("x as (u32, u32, u32)", "(x as (u32, u32, u32))");
+  TestParse("x as [bool;7]", "(x as [bool; 7])");
+  TestParse("x as &[f64]", "(x as &[f64])");
+  TestParse("x as fn(u32, u32)->()", "(x as fn (u32, u32) -> ())");
+  TestParse("x as *const [mod::whatever<bool>; 8]", "(x as *const [mod::whatever<bool>; 8])");
 }

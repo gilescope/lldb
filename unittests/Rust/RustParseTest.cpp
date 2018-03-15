@@ -67,6 +67,8 @@ TEST(RustParseTest, Simple) {
   TestParse("1--2", "(1 - - (2))");
   TestParse("1-+-2", "(1 - + (- (2)))");
   TestParse("[1,2,3][5]", "([1, 2, 3] @ 5)");
+  // We don't serialize sizeof all that nicely.
+  TestParse("sizeof(())", "@ (())");
 }
 
 TEST(RustParseTest, Members) {

@@ -699,6 +699,30 @@ RustExpressionUP Parser::Path(Status &error) {
                                                std::move(type_list));
 }
 
+RustExpressionUP Parser::Sizeof(Status &error) {
+  assert(CurrentToken().kind == SIZEOF);
+  Advance();
+
+  if (CurrentToken().kind != '(') {
+    error.SetErrorString("'(' expected");
+    return RustExpressionUP();
+  }
+  Advance();
+
+  RustExpressionUP expr = Expr(error);
+  if (!expr) {
+    return expr;
+  }
+
+  if (CurrentToken().kind != ')') {
+    error.SetErrorString("')' expected");
+    return RustExpressionUP();
+  }
+  Advance();
+
+  return llvm::make_unique<RustUnaryExpression<'@', UnarySizeof>>(std::move(expr));
+}
+
 RustExpressionUP Parser::Term(Status &error) {
   RustExpressionUP term;
 
@@ -762,7 +786,7 @@ RustExpressionUP Parser::Term(Status &error) {
     break;
 
   case SIZEOF:
-    return Unimplemented(error);
+    return Sizeof(error);
 
   case '*':
     term = Unary<'*', UnaryDereference>(error);

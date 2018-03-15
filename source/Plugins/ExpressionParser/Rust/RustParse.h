@@ -46,8 +46,9 @@ private:
   RustExpressionUP Index(RustExpressionUP &&array, Status &error);
   RustExpressionUP Term(Status &error);
   RustExpressionUP Binary(Status &error);
-  RustTypeExpressionUP Type(Status &error);
+  RustExpressionUP Sizeof(Status &error);
 
+  RustTypeExpressionUP Type(Status &error);
   RustTypeExpressionUP ArrayType(Status &error);
   RustTypeExpressionUP ReferenceType(Status &error);
   RustTypeExpressionUP PointerType(Status &error);

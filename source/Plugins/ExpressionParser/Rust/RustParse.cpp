@@ -556,6 +556,11 @@ RustExpressionUP Parser::Array(Status &error) {
   assert(CurrentToken().kind == '[');
   Advance();
 
+  // This doesn't affect us, so parse and ignore.
+  if (CurrentToken().kind == MUT) {
+    Advance();
+  }
+
   RustExpressionUP expr = Expr(error);
   if (!expr) {
     return expr;
@@ -564,13 +569,13 @@ RustExpressionUP Parser::Array(Status &error) {
   RustExpressionUP result;
   if (CurrentToken().kind == ';') {
     Advance();
-    if (CurrentToken().kind != INTEGER) {
-      error.SetErrorString("expected integer literal");
-    } else {
-      result = llvm::make_unique<RustArrayWithLength>(std::move(expr),
-                                                      CurrentToken().uinteger.getValue());
-      Advance();
+
+    RustExpressionUP length = Expr(error);
+    if (!length) {
+      return length;
     }
+
+    result = llvm::make_unique<RustArrayWithLength>(std::move(expr), std::move(length));
   } else if (CurrentToken().kind == ',') {
     Advance();
     std::vector<RustExpressionUP> exprs;

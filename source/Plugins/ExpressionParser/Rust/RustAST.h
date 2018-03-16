@@ -467,17 +467,14 @@ private:
 class RustArrayWithLength : public RustExpression {
 public:
 
-  RustArrayWithLength(RustExpressionUP &&value, uint64_t length)
+  RustArrayWithLength(RustExpressionUP &&value, RustExpressionUP &&length)
     : m_value(std::move(value)),
-      m_length(length)
+      m_length(std::move(length))
   {
   }
 
   void print(Stream &stream) override {
-    stream << "[" << m_value << "; "
-           // Work around Stream weirdness.
-           << int64_t(m_length)
-           << "]";
+    stream << "[" << m_value << "; " << m_length << "]";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -485,7 +482,7 @@ public:
 private:
 
   RustExpressionUP m_value;
-  uint64_t m_length;
+  RustExpressionUP m_length;
 };
 
 // Note that this may also represent a tuple-struct expression if the

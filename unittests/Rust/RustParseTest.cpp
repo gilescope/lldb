@@ -44,6 +44,7 @@ TEST(RustParseTest, Literals) {
 
   TestParse("[1,2,3]", "[1, 2, 3]");
   TestParse("[72*3; 8]", "[(72 * 3); 8]");
+  TestParse("[72*3; 8*9]", "[(72 * 3); (8 * 9)]");
 
   TestParse("()", "()");
   TestParse("(1,)", "(1, )");

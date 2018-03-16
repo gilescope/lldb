@@ -347,7 +347,6 @@ private:
   RustTypeExpressionUP m_type;
 };
 
-// FIXME maybe this should just be RustLiteral with the correct type.
 class RustBooleanLiteral : public RustExpression {
 public:
 
@@ -367,7 +366,6 @@ private:
   bool m_value;
 };
 
-// FIXME maybe this should just be RustLiteral with the correct type.
 class RustCharLiteral : public RustExpression {
 public:
 

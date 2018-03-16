@@ -33,6 +33,21 @@ GetASTContext(ValueObjectSP val, Status &error)
   return result;
 }
 
+static RustASTContext *
+GetASTContext(ExecutionContext &ctxt, Status &error)
+{
+  Target *target = ctxt.GetTargetPtr();
+  TypeSystem *sys = target->GetScratchTypeSystemForLanguage(&error, eLanguageTypeRust);
+  if (!sys) {
+    return nullptr;
+  }
+  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(sys);
+  if (!result) {
+    error.SetErrorString("not a Rust type!?");
+  }
+  return result;
+}
+
 static ValueObjectSP
 CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType type,
 		      Status &error)
@@ -267,17 +282,28 @@ RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 lldb::ValueObjectSP
 RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
-  // FIXME.
-  error.SetErrorString("Unimplemented");
-  return ValueObjectSP();
+  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+
+  CompilerType type = ast->CreateBoolType(ConstString("bool"));
+  Scalar val(m_value);
+  return CreateValueFromScalar(exe_ctx, val, type, error);
 }
 
 lldb::ValueObjectSP
 RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
-  // FIXME.
-  error.SetErrorString("Unimplemented");
-  return ValueObjectSP();
+  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+
+  CompilerType type = ast->CreateIntegralType(ConstString(m_is_byte ? "u8" : "char"),
+                                              false, m_is_byte ? 1 : 4);
+  Scalar val(m_value);
+  return CreateValueFromScalar(exe_ctx, val, type, error);
 }
 
 lldb::ValueObjectSP

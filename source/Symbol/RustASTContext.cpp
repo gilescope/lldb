@@ -1526,10 +1526,11 @@ CompilerType RustASTContext::CreateBoolType(const lldb_private::ConstString &nam
 
 CompilerType RustASTContext::CreateIntegralType(const lldb_private::ConstString &name,
                                                 bool is_signed,
-                                                uint64_t byte_size) {
+                                                uint64_t byte_size,
+                                                bool is_char_type) {
   if (RustType *cached = FindCachedType(name))
     return CompilerType(this, cached);
-  RustType *type = new RustIntegral(name, is_signed, byte_size);
+  RustType *type = new RustIntegral(name, is_signed, byte_size, is_char_type);
   return CacheType(name, type);
 }
 
@@ -1539,6 +1540,11 @@ CompilerType RustASTContext::CreateIntrinsicIntegralType(bool is_signed, uint64_
 
   ConstString cname(name);
   return CreateIntegralType(cname, is_signed, byte_size);
+}
+
+CompilerType RustASTContext::CreateCharType() {
+  ConstString cname("char");
+  return CreateIntegralType(cname, false, 4, true);
 }
 
 CompilerType RustASTContext::CreateFloatType(const lldb_private::ConstString &name,

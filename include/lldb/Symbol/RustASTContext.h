@@ -101,8 +101,10 @@ public:
   CompilerType CreateVoidType();
   CompilerType CreateBoolType(const lldb_private::ConstString &name);
   CompilerType CreateIntegralType(const lldb_private::ConstString &name,
-                                  bool is_signed, uint64_t byte_size);
+                                  bool is_signed, uint64_t byte_size,
+                                  bool is_char_type = false);
   CompilerType CreateIntrinsicIntegralType(bool is_signed, uint64_t byte_size);
+  CompilerType CreateCharType();
   CompilerType CreateFloatType(const lldb_private::ConstString &name,
                                uint64_t byte_size);
   CompilerType CreatePointerType(const lldb_private::ConstString &name,

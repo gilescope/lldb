@@ -300,8 +300,12 @@ RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
     return ValueObjectSP();
   }
 
-  CompilerType type = ast->CreateIntegralType(ConstString(m_is_byte ? "u8" : "char"),
-                                              false, m_is_byte ? 1 : 4);
+  CompilerType type;
+  if (m_is_byte) {
+    type = ast->CreateIntegralType(ConstString("u8"), false, 1);
+  } else {
+    type = ast->CreateCharType();
+  }
   Scalar val(m_value);
   return CreateValueFromScalar(exe_ctx, val, type, error);
 }

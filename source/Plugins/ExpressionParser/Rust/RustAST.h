@@ -57,9 +57,14 @@ typedef std::unique_ptr<RustExpression> RustExpressionUP;
 class RustTypeExpression;
 typedef std::unique_ptr<RustTypeExpression> RustTypeExpressionUP;
 
+class RustPathExpression;
+typedef std::unique_ptr<RustPathExpression> RustPathExpressionUP;
+
 Stream &operator<< (Stream &stream, const RustExpressionUP &expr);
+Stream &operator<< (Stream &stream, const RustPathExpressionUP &expr);
 Stream &operator<< (Stream &stream, const RustTypeExpressionUP &type);
 Stream &operator<< (Stream &stream, const Scalar &value);
+Stream &operator<< (Stream &stream, const std::pair<std::string, RustExpressionUP> &value);
 
 template<typename T>
 Stream &operator<< (Stream &stream, const std::vector<T> &items) {
@@ -483,6 +488,8 @@ private:
   uint64_t m_length;
 };
 
+// Note that this may also represent a tuple-struct expression if the
+// "function" is a path referring to a tuple type.
 class RustCall : public RustExpression {
 public:
 
@@ -566,6 +573,36 @@ private:
   int m_supers;
   std::vector<std::string> m_path;
   std::vector<RustTypeExpressionUP> m_generic_params;
+};
+
+class RustStructExpression : public RustExpression {
+public:
+
+  // Note that |copy| can be null if no '..' form was seen.
+  RustStructExpression(RustPathExpressionUP &&path,
+                       std::vector<std::pair<std::string, RustExpressionUP>> &&inits,
+                       RustExpressionUP &&copy)
+    : m_path(std::move(path)),
+      m_inits(std::move(inits)),
+      m_copy(std::move(copy))
+  {
+  }
+
+  void print(Stream &stream) override {
+    stream << m_path << " { " << m_inits;
+    if (m_copy) {
+      stream << ", .. " << m_copy;
+    }
+    stream << " }";
+  }
+
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+private:
+
+  RustPathExpressionUP m_path;
+  std::vector<std::pair<std::string, RustExpressionUP>> m_inits;
+  RustExpressionUP m_copy;
 };
 
 

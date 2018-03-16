@@ -438,7 +438,20 @@ RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error)
   return ValueObjectSP();
 }
 
+lldb::ValueObjectSP
+RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
+{
+  error.SetErrorString("struct expressions not supported");
+  return ValueObjectSP();
+}
+
+
 Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) {
+  expr->print(stream);
+  return stream;
+}
+
+Stream &lldb_private::operator<< (Stream &stream, const RustPathExpressionUP &expr) {
   expr->print(stream);
   return stream;
 }
@@ -451,6 +464,11 @@ Stream &lldb_private::operator<< (Stream &stream, const RustTypeExpressionUP &ty
 Stream &lldb_private::operator<< (Stream &stream, const Scalar &value) {
   value.GetValue(&stream, false);
   return stream;
+}
+
+Stream &lldb_private::operator<< (Stream &stream,
+                                  const std::pair<std::string, RustExpressionUP> &value) {
+  return stream << value.first << ": " << value.second;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -635,6 +653,66 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
                                                                   std::move(idx));
 }
 
+RustExpressionUP Parser::Struct(RustPathExpressionUP &&path, Status &error) {
+  assert(CurrentToken().kind == '{');
+  Advance();
+
+  std::vector<std::pair<std::string, RustExpressionUP>> inits;
+  RustExpressionUP copy;
+  while (CurrentToken().kind != '}') {
+    if (CurrentToken().kind == IDENTIFIER) {
+      std::string field = std::move(CurrentToken().str);
+      Advance();
+
+      RustExpressionUP value;
+      if (CurrentToken().kind == ',' || CurrentToken().kind == '}') {
+        // Plain "field".
+        std::vector<std::string> path;
+        path.push_back(field);
+        value = llvm::make_unique<RustPathExpression>(true, 0, std::move(path),
+                                                      std::vector<RustTypeExpressionUP>());
+      } else if (CurrentToken().kind != ':') {
+        error.SetErrorString("':' expected");
+        return RustExpressionUP();
+      } else {
+        Advance();
+
+        value = Expr(error);
+        if (!value) {
+          return value;
+        }
+      }
+
+      inits.emplace_back(std::move(field), std::move(value));
+    } else if (CurrentToken().kind == DOTDOT) {
+      // FIXME technically this can't occur first - a field
+      // initializer is needed.
+      Advance();
+      copy = Expr(error);
+      if (!copy) {
+        return copy;
+      }
+      break;
+    } else {
+      error.SetErrorString("identifier or '..' expected");
+      return RustExpressionUP();
+    }
+
+    if (CurrentToken().kind != ',') {
+      break;
+    }
+    Advance();
+  }
+
+  if (CurrentToken().kind != '}') {
+    error.SetErrorString("'}' expected");
+    return RustExpressionUP();
+  }
+
+  return llvm::make_unique<RustStructExpression>(std::move(path), std::move(inits),
+                                                 std::move(copy));
+}
+
 RustExpressionUP Parser::Path(Status &error) {
   bool relative = true;
   int supers = 0;
@@ -645,6 +723,8 @@ RustExpressionUP Parser::Path(Status &error) {
     if (CurrentToken().kind != COLONCOLON) {
       std::vector<std::string> path;
       path.emplace_back("self");
+      // This one can't be a struct expression, so we just return
+      // directly.
       return llvm::make_unique<RustPathExpression>(true, 0, std::move(path),
                                                    std::vector<RustTypeExpressionUP> ());
     }
@@ -695,8 +775,15 @@ RustExpressionUP Parser::Path(Status &error) {
     return RustExpressionUP();
   }
 
-  return llvm::make_unique<RustPathExpression>(relative, supers, std::move(path),
-                                               std::move(type_list));
+  RustPathExpressionUP result =
+    llvm::make_unique<RustPathExpression>(relative, supers, std::move(path),
+                                          std::move(type_list));
+
+  if (CurrentToken().kind == '{') {
+    return Struct(std::move(result), error);
+  }
+
+  return result;
 }
 
 RustExpressionUP Parser::Sizeof(Status &error) {

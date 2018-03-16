@@ -57,6 +57,12 @@ TEST(RustParseTest, Literals) {
 
   TestParse("'c'", "'c'");
   TestParse("b'c'", "b'c'");
+
+  TestParse("Struct{}", "Struct {  }");
+  TestParse("Struct{name}", "Struct { name: name }");
+  TestParse("Struct{x: 57}", "Struct { x: 57 }");
+  TestParse("Struct{x: 57, y: 88, z: 'b'}", "Struct { x: 57, y: 88, z: 'b' }");
+  TestParse("Struct{x: 57, ..z}", "Struct { x: 57, .. z }");
 }
 
 TEST(RustParseTest, Simple) {

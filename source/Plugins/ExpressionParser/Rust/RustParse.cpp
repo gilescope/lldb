@@ -23,19 +23,14 @@ using namespace lldb;
 using namespace llvm;
 
 static RustASTContext *
-GetASTContext(const CompilerType &type, Status &error)
+GetASTContext(ValueObjectSP val, Status &error)
 {
-  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  RustASTContext *result =
+    llvm::dyn_cast_or_null<RustASTContext>(val->GetCompilerType().GetTypeSystem());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
   return result;
-}
-
-static RustASTContext *
-GetASTContext(ValueObjectSP val, Status &error)
-{
-  return GetASTContext(val->GetCompilerType(), error);
 }
 
 static ValueObjectSP

@@ -658,6 +658,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("unimplemented");
     return CompilerType();
   }
 
@@ -683,6 +684,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("unimplemented");
     return CompilerType();
   }
 
@@ -705,6 +707,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("unimplemented");
     return CompilerType();
   }
 
@@ -732,6 +735,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("unimplemented");
     return CompilerType();
   }
 
@@ -757,6 +761,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("unimplemented");
     return CompilerType();
   }
 
@@ -779,6 +784,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    error.SetErrorString("unimplemented");
     return CompilerType();
   }
 

@@ -10,7 +10,9 @@
 #include "RustUserExpression.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/DiagnosticManager.h"
+#include "lldb/Expression/ExpressionVariable.h"
 #include "lldb/Symbol/RustASTContext.h"
+#include "lldb/Target/Target.h"
 #include "Plugins/ExpressionParser/Rust/RustParse.h"
 
 using namespace lldb_private::rust;
@@ -50,6 +52,16 @@ lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnos
     return lldb::eExpressionDiscarded;
   }
 
-  // FIXME
-  return lldb::eExpressionDiscarded; // eExpressionCompleted;
+  result.reset(new ExpressionVariable(ExpressionVariable::eKindRust));
+  result->m_live_sp = result->m_frozen_sp = value;
+  result->m_flags |= ExpressionVariable::EVIsProgramReference;
+  Target *target = exe_ctx.GetTargetPtr();
+  PersistentExpressionState *pv =
+      target->GetPersistentExpressionStateForLanguage(eLanguageTypeRust);
+  if (pv != nullptr) {
+    result->SetName(pv->GetNextPersistentVariableName());
+    pv->AddVariable(result);
+  }
+
+  return lldb::eExpressionCompleted;
 }

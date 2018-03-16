@@ -9,6 +9,7 @@
 
 #include "RustUserExpression.h"
 #include "lldb/Core/ValueObject.h"
+#include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Symbol/RustASTContext.h"
 #include "Plugins/ExpressionParser/Rust/RustParse.h"
 
@@ -26,13 +27,12 @@ bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
   Parser parser(exe_ctx.GetTargetSP(), m_expr_text);
   Status status;
   m_expr = parser.Expr(status);
-  // if (!m_expr) {
-  //   // Report error.
-  //   return false;
-  // }
+  if (!m_expr) {
+    diagnostic_manager.PutString(eDiagnosticSeverityError, status.AsCString());
+    return false;
+  }
 
-  // blah blah
-  return false;			// FIXME
+  return true;
 }
 
 lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnostic_manager,
@@ -43,4 +43,13 @@ lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnos
 {
   Status error;
   ValueObjectSP value = m_expr->Evaluate(exe_ctx, error);
+  m_expr.reset();
+
+  if (!value) {
+    diagnostic_manager.PutString(eDiagnosticSeverityError, error.AsCString());
+    return lldb::eExpressionDiscarded;
+  }
+
+  // FIXME
+  return lldb::eExpressionDiscarded; // eExpressionCompleted;
 }

@@ -226,10 +226,15 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
     else if (encoding == DW_ATE_float)
       compiler_type = m_ast.CreateFloatType(type_name_const_str, byte_size);
     else if (encoding == DW_ATE_signed || encoding == DW_ATE_unsigned ||
-	     encoding == DW_ATE_unsigned_char)
+             // DW_ATE_UCS seems to be less used (perhaps
+             // Fortran-specific?) and since I'm not planning to have
+             // rustc emit it, we ignore it here.
+	     encoding == DW_ATE_unsigned_char || encoding == DW_ATE_UTF)
       compiler_type = m_ast.CreateIntegralType(type_name_const_str,
 					       encoding == DW_ATE_signed,
-					       byte_size);
+					       byte_size,
+                                               (encoding == DW_ATE_unsigned_char ||
+                                                encoding == DW_ATE_UTF));
     else
       dwarf->GetObjectFile()->GetModule()->LogMessage(
           log, "DWARFASTParserRust::ParseSimpleType (die = 0x%8.8x) %s "

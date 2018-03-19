@@ -1383,8 +1383,6 @@ bool RustASTContext::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
     }
 
     uint32_t item_count = 1;
-    // A few formats, we might need to modify our size and count for depending
-    // on how we are trying to display the value...
     switch (format) {
     default:
     case eFormatBoolean:

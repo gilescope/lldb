@@ -656,7 +656,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("unimplemented");
+    error.SetErrorString("path type lookup unimplemented");
     return CompilerType();
   }
 
@@ -682,7 +682,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("unimplemented");
+    error.SetErrorString("array type lookup unimplemented");
     return CompilerType();
   }
 
@@ -705,7 +705,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("unimplemented");
+    error.SetErrorString("slice type lookup unimplemented");
     return CompilerType();
   }
 
@@ -733,7 +733,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("unimplemented");
+    error.SetErrorString("pointer type lookup unimplemented");
     return CompilerType();
   }
 
@@ -759,7 +759,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("unimplemented");
+    error.SetErrorString("function type lookup unimplemented");
     return CompilerType();
   }
 
@@ -782,7 +782,7 @@ public:
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("unimplemented");
+    error.SetErrorString("tuple type lookup unimplemented");
     return CompilerType();
   }
 

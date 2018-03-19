@@ -470,6 +470,50 @@ RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
   return ValueObjectSP();
 }
 
+////////////////////////////////////////////////////////////////
+// Types
+
+CompilerType
+RustPathTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  Target *target = exe_ctx.GetTargetPtr();
+  if (!target) {
+    error.SetErrorString("could not get target to look up type");
+    return CompilerType();
+  }
+
+  // FIXME must support super, generic params, and also handle
+  // relative case more correctly
+  if (m_supers) {
+    error.SetErrorString("can't use super:: in type name yet");
+    return CompilerType();
+  }
+  if (!m_generic_params.empty()) {
+    error.SetErrorString("can't use generic parameters in type name yet");
+    return CompilerType();
+  }
+  std::string fullname;
+  for (const std::string &name : m_path) {
+    if (fullname.empty()) {
+      fullname = name;
+    } else {
+      fullname = fullname + "::" + name;
+    }
+  }
+
+  SymbolContext sc;
+  TypeList type_list;
+  llvm::DenseSet<SymbolFile *> searched_symbol_files;
+  uint32_t num_matches = target->GetImages().FindTypes(
+      sc, ConstString(fullname.c_str()), false, 2, searched_symbol_files, type_list);
+  if (num_matches > 0) {
+    return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
+  }
+  error.SetErrorStringWithFormat("could not find type \"%s\"", fullname.c_str());
+  return CompilerType();
+}
+
+////////////////////////////////////////////////////////////////
+// Output
 
 Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) {
   expr->print(stream);

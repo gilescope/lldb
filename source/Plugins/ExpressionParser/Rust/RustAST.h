@@ -655,10 +655,7 @@ public:
     }
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("path type lookup unimplemented");
-    return CompilerType();
-  }
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error);
 
 private:
 

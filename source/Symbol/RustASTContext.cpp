@@ -1380,6 +1380,44 @@ bool RustASTContext::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
         }
         return true;
       }
+    } else if (format == eFormatUnicode32) {
+      if (RustIntegral *intlike = t->AsInteger()) {
+        if (intlike->IsCharType()) {
+          uint64_t value = data.GetMaxU64Bitfield(&byte_offset, byte_size,
+                                                  bitfield_bit_size,
+                                                  bitfield_bit_offset);
+          switch (value) {
+          case '\n':
+            s->PutCString("'\\n'");
+            break;
+          case '\r':
+            s->PutCString("'\\r'");
+            break;
+          case '\t':
+            s->PutCString("'\\t'");
+            break;
+          case '\\':
+            s->PutCString("'\\\\'");
+            break;
+          case '\0':
+            s->PutCString("'\\0'");
+            break;
+          case '\'':
+            s->PutCString("'\\''");
+            break;
+
+          default:
+            if (value < 128 && isprint(value)) {
+              s->Printf("'%c'", char(value));
+            } else {
+              s->Printf("'\\u{%x}'", unsigned(value));
+            }
+            break;
+          }
+
+          return true;
+        }
+      }
     }
 
     uint32_t item_count = 1;

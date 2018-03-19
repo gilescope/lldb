@@ -1572,7 +1572,7 @@ CompilerType RustASTContext::CreateIntegralType(const lldb_private::ConstString 
 
 CompilerType RustASTContext::CreateIntrinsicIntegralType(bool is_signed, uint64_t byte_size) {
   char name[100];
-  snprintf(name, sizeof(name), "%sint%d", is_signed ? "" : "u", int(byte_size * 8));
+  snprintf(name, sizeof(name), "%s%d", is_signed ? "i" : "u", int(byte_size * 8));
 
   ConstString cname(name);
   return CreateIntegralType(cname, is_signed, byte_size);

@@ -512,6 +512,31 @@ RustPathTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return CompilerType();
 }
 
+CompilerType
+RustArrayTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  RustASTContext *context = GetASTContext(exe_ctx, error);
+  if (!context) {
+    return CompilerType();
+  }
+
+  CompilerType element = m_element->Evaluate(exe_ctx, error);
+  if (!element) {
+    return element;
+  }
+
+  return context->CreateArrayType(element, m_len);
+}
+
+CompilerType
+RustPointerTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  CompilerType target = m_target->Evaluate(exe_ctx, error);
+  if (!target) {
+    return target;
+  }
+  // FIXME references
+  return target.GetPointerType();
+}
+
 ////////////////////////////////////////////////////////////////
 // Output
 

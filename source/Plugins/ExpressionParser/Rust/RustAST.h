@@ -678,10 +678,7 @@ public:
     stream << "[" << m_element << "; " << int64_t(m_len) << "]";
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("array type lookup unimplemented");
-    return CompilerType();
-  }
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 
@@ -729,10 +726,7 @@ public:
     }
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("pointer type lookup unimplemented");
-    return CompilerType();
-  }
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 

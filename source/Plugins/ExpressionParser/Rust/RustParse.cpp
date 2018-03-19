@@ -117,6 +117,11 @@ lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, St
 ValueObjectSP
 lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
 {
+  RustASTContext *ast = GetASTContext(val, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+
   CompilerType type = val->GetCompilerType();
   if (!type.IsScalarType()) {
     error.SetErrorString("not a scalar type");
@@ -128,7 +133,10 @@ lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val
     error.SetErrorString("could not resolve scalar value");
     return ValueObjectSP();
   }
-  if (!scalar.OnesComplement()) {
+
+  if (ast->IsBooleanType(type.GetOpaqueQualType())) {
+    scalar = Scalar(int(scalar.IsZero()));
+  } else if (!scalar.OnesComplement()) {
     error.SetErrorString("could not negate scalar value");
     return ValueObjectSP();
   }

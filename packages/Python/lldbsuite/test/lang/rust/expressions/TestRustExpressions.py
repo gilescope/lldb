@@ -95,6 +95,5 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(bool)  = true", str(v))
         v = frame.EvaluateExpression("false")
         self.assertEqual("(bool)  = false", str(v))
-        # FIXME
-        # v = frame.EvaluateExpression("!true")
-        # self.assertEqual("(bool)  = false", str(v))
+        v = frame.EvaluateExpression("!true")
+        self.assertEqual("(bool)  = false", str(v))

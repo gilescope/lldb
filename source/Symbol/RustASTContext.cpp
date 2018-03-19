@@ -1091,8 +1091,12 @@ lldb::Encoding RustASTContext::GetEncoding(lldb::opaque_compiler_type_t type,
                                            uint64_t &count) {
   count = 1;
   bool is_signed;
-  if (IsIntegerType(type, is_signed))
-    return is_signed ? lldb::eEncodingSint : eEncodingUint;
+  if (IsIntegerType(type, is_signed)) {
+    return is_signed ? eEncodingSint : eEncodingUint;
+  }
+  if (IsBooleanType(type)) {
+    return eEncodingUint;
+  }
   bool is_complex;
   uint32_t complex_count;
   if (IsFloatingPointType(type, complex_count, is_complex)) {

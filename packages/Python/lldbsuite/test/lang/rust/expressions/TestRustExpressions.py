@@ -107,3 +107,13 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(char) field2 = 'Q'", str(v))
         v = frame.EvaluateExpression("vi8array[2]")
         self.assertEqual("(i8) [2] = 3", str(v))
+        v = frame.EvaluateExpression("*vboolpointer")
+        self.assertEqual("(bool) *vboolpointer = true", str(v))
+        v = frame.EvaluateExpression("*vcharpointer")
+        self.assertEqual("(char) *vcharpointer = 'Q'", str(v))
+        v = frame.EvaluateExpression("*vi8ref")
+        self.assertEqual("(i8) *vi8ref = -23", str(v))
+        v = frame.EvaluateExpression("*vu8ref")
+        self.assertEqual("(u8) *vu8ref = 23", str(v))
+        
+                         

@@ -322,7 +322,7 @@ lldb::ValueObjectSP
 RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
   // FIXME.
-  error.SetErrorString("Unimplemented");
+  error.SetErrorString("string literals unimplemented");
   return ValueObjectSP();
 }
 
@@ -330,7 +330,7 @@ lldb::ValueObjectSP
 RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
   // FIXME.
-  error.SetErrorString("Unimplemented");
+  error.SetErrorString("path expressions unimplemented");
   return ValueObjectSP();
 }
 
@@ -578,7 +578,7 @@ Stream &lldb_private::operator<< (Stream &stream,
 
 // temporary
 RustExpressionUP Parser::Unimplemented(Status &error) {
-  error.SetErrorString("unimplemented");
+  error.SetErrorString("parser production unimplemented");
   return RustExpressionUP();
 }
 

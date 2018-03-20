@@ -252,7 +252,7 @@ ValueObjectSP
 lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
                                 lldb::ValueObjectSP right, Status &error)
 {
-  if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
+  if (!right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }

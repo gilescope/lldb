@@ -103,3 +103,5 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(u8)  = 23", str(v))
         v = frame.EvaluateExpression("vtuple.0")
         self.assertEqual("(u8)  = 23", str(v))
+        v = frame.EvaluateExpression("vi8array[2]")
+        self.assertEqual("(i8) [2] = 3", str(v))

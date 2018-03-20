@@ -13,6 +13,7 @@
 #include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/TypeList.h"
+#include "lldb/Symbol/VariableList.h"
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/Status.h"
 #include <functional>
@@ -329,8 +330,57 @@ RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 lldb::ValueObjectSP
 RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
-  // FIXME.
-  error.SetErrorString("path expressions unimplemented");
+  Target *target = exe_ctx.GetTargetPtr();
+  if (!target) {
+    error.SetErrorString("could not get target to look up item");
+    return ValueObjectSP();
+  }
+
+  StackFrame *frame = exe_ctx.GetFramePtr();
+  if (frame == nullptr) {
+    // FIXME?
+    error.SetErrorString("no frame when looking up item");
+    return ValueObjectSP();
+  }
+
+  // FIXME must support super, generic params, and also handle
+  // relative case more correctly
+  if (m_supers) {
+    error.SetErrorString("can't use super:: in item name yet");
+    return ValueObjectSP();
+  }
+  if (!m_generic_params.empty()) {
+    error.SetErrorString("can't use generic parameters in item name yet");
+    return ValueObjectSP();
+  }
+  std::string fullname;
+  for (const std::string &name : m_path) {
+    if (fullname.empty()) {
+      fullname = name;
+    } else {
+      fullname = fullname + "::" + name;
+    }
+  }
+
+  ConstString cs_name(fullname.c_str());
+  VariableListSP frame_vars = frame->GetInScopeVariableList(false);
+  if (frame_vars) {
+    if (VariableSP var = frame_vars->FindVariable(cs_name)) {
+      // FIXME dynamic?  should come from the options, which we aren't
+      // passing in.
+      return frame->GetValueObjectForFrameVariable(var, eNoDynamicValues);
+    }
+  }
+
+  VariableList variable_list;
+  uint32_t num_matches =
+    target->GetImages().FindGlobalVariables(ConstString(fullname.c_str()),
+                                            false, 1, variable_list);
+  if (num_matches > 0) {
+    // FIXME dynamic?
+    return frame->TrackGlobalVariable(variable_list.GetVariableAtIndex(0), eNoDynamicValues);
+  }
+  error.SetErrorStringWithFormat("could not find item \"%s\"", fullname.c_str());
   return ValueObjectSP();
 }
 

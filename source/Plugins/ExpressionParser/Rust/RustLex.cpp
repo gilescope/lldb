@@ -205,6 +205,9 @@ bool Lexer::BasicInteger(int *radix_out, std::string *value) {
     if (m_iter == m_end) {
       // Plain "0".
       value->push_back('0');
+      if (radix_out) {
+        *radix_out = radix;
+      }
       return true;
     }
 

@@ -843,7 +843,6 @@ bool RustASTContext::IsPossibleDynamicType(lldb::opaque_compiler_type_t type,
     target_type->Clear();
   // FIXME eventually we'll handle trait object pointers here
   if (static_cast<RustType *>(type)->AsEnum()) {
-    // FIXME have to target_type->SetCompilerType(this, ...) here
     return true;
   }
   return false;

@@ -491,20 +491,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -551,20 +552,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -607,20 +609,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -659,20 +662,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -707,20 +711,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -751,20 +756,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -795,20 +801,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -835,20 +842,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -875,20 +883,21 @@ bool Scalar::Promote(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -911,20 +920,21 @@ bool Scalar::Promote(Scalar::Type type) {
       success = true;
       break;
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, false, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }
@@ -1158,20 +1168,21 @@ bool Scalar::Cast(Scalar::Type type) {
       break;
 
     case e_float:
-      m_float = llvm::APFloat(m_integer.bitsToFloat());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEsingle());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_double:
-      m_float = llvm::APFloat(m_integer.bitsToDouble());
+      m_float = llvm::APFloat(llvm::APFloat::IEEEdouble());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
 
     case e_long_double:
-      if (m_ieee_quad)
-        m_float = llvm::APFloat(llvm::APFloat::IEEEquad(), m_integer);
-      else
-        m_float = llvm::APFloat(llvm::APFloat::x87DoubleExtended(), m_integer);
+      m_float = llvm::APFloat(m_ieee_quad ? llvm::APFloat::IEEEquad() :
+                              llvm::APFloat::x87DoubleExtended());
+      m_float.convertFromAPInt(m_integer, true, llvm::APFloat::rmNearestTiesToEven);
       success = true;
       break;
     }

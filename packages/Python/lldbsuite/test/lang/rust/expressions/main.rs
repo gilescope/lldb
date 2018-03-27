@@ -71,5 +71,7 @@ fn main() {
     let vsimpleenum = SimpleEnum::Two(83, 92);
     let voptenum = OptimizedEnum::Null;
 
+    let vsimpleenum_ref = &vsimpleenum;
+
     do_nothing();               // breakpoint
 }

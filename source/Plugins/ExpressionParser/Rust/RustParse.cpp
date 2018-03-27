@@ -368,7 +368,7 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
     if (VariableSP var = frame_vars->FindVariable(cs_name)) {
       // FIXME dynamic?  should come from the options, which we aren't
       // passing in.
-      return frame->GetValueObjectForFrameVariable(var, eNoDynamicValues);
+      return frame->GetValueObjectForFrameVariable(var, eDynamicDontRunTarget);
     }
   }
 
@@ -378,7 +378,7 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
                                             false, 1, variable_list);
   if (num_matches > 0) {
     // FIXME dynamic?
-    return frame->TrackGlobalVariable(variable_list.GetVariableAtIndex(0), eNoDynamicValues);
+    return frame->TrackGlobalVariable(variable_list.GetVariableAtIndex(0), eDynamicDontRunTarget);
   }
   error.SetErrorStringWithFormat("could not find item \"%s\"", fullname.c_str());
   return ValueObjectSP();
@@ -477,6 +477,13 @@ RustTupleFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
   ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
   if (!left) {
     return left;
+  }
+
+  // We always want to let users see the real type, because in Rust
+  // only trait objects and enums can be dynamic.
+  ValueObjectSP dynamic = left->GetDynamicValue(eDynamicCanRunTarget);
+  if (dynamic) {
+    left = dynamic;
   }
 
   ValueObjectSP result = left->GetChildAtIndex(m_field, true);

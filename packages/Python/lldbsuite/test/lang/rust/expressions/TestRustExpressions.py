@@ -116,6 +116,5 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(i8) *vi8ref = -23", str(v))
         v = frame.EvaluateExpression("*vu8ref")
         self.assertEqual("(u8) *vu8ref = 23", str(v))
-        # FIXME
-        # v = frame.EvaluateExpression("vsimpleenum.1")
-        # self.assertEqual("(u8)  = 92", str(v))
+        v = frame.EvaluateExpression("vsimpleenum.1")
+        self.assertEqual("(u16)  = 92", str(v))

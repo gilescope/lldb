@@ -78,15 +78,16 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
 
   uint64_t discr_offset, discr_byte_size;
   if (ast->GetEnumDiscriminantLocation(type, discr_offset, discr_byte_size)) {
-    AddressType address_type;
-    lldb::addr_t original_ptr = in_value.GetPointerValue(&address_type);
-    if (original_ptr == LLDB_INVALID_ADDRESS)
+    lldb::addr_t original_ptr = in_value.GetAddressOf(false); // FIXME?
+    if (original_ptr == LLDB_INVALID_ADDRESS) {
       return false;
+    }
 
     ExecutionContext exe_ctx(in_value.GetExecutionContextRef());
     Process *process = exe_ctx.GetProcessPtr();
-    if (process == nullptr)
+    if (process == nullptr) {
       return false;
+    }
 
     Status error;
     uint64_t discriminant =
@@ -99,7 +100,8 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
     CompilerType variant_type = ast->FindEnumVariant(type, discriminant);
     class_type_or_name = TypeAndOrName(variant_type);
     // The address doesn't change.
-    dynamic_address = original_ptr;
+    dynamic_address.SetLoadAddress(original_ptr, exe_ctx.GetTargetPtr());
+    value_type = Value::ValueType::eValueTypeLoadAddress;
 
     return true;
   }

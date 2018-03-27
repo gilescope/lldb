@@ -433,15 +433,6 @@ public:
     return ")";
   }
 
-  void FinishInitialization() override {
-    for (auto&& iter : *this) {
-      RustType *rtype = static_cast<RustType *>(iter.m_type.GetOpaqueQualType());
-      if (RustAggregateBase* agg = rtype->AsAggregate()) {
-        agg->DropDiscriminant();
-      }
-    }
-  }
-
 private:
 
   // As opposed to a tuple struct.
@@ -538,6 +529,15 @@ public:
       idx = iter->second;
     }
     return FieldAt(idx)->m_type;
+  }
+
+  void FinishInitialization() override {
+    for (auto&& iter : *this) {
+      RustType *rtype = static_cast<RustType *>(iter.m_type.GetOpaqueQualType());
+      if (RustAggregateBase* agg = rtype->AsAggregate()) {
+        agg->DropDiscriminant();
+      }
+    }
   }
 
 private:

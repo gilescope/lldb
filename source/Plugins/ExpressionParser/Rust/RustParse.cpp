@@ -464,6 +464,13 @@ RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
     return left;
   }
 
+  // We always want to let users see the real type, because in Rust
+  // only trait objects and enums can be dynamic.
+  ValueObjectSP dynamic = left->GetDynamicValue(eDynamicCanRunTarget);
+  if (dynamic) {
+    left = dynamic;
+  }
+
   ValueObjectSP result = left->GetChildMemberWithName(ConstString(m_field.c_str()), true);
   if (!result) {
     error.SetErrorStringWithFormat("no field named %s", m_field.c_str());

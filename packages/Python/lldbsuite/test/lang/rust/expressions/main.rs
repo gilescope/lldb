@@ -23,7 +23,7 @@ pub enum CLikeEnum {
 }
 
 pub enum SimpleEnum {
-    One(u8, u8),
+    One{f1: u8, f2: u8},
     Two(u16, u16)
 }
 
@@ -69,6 +69,7 @@ fn main() {
     let vclikeenum = CLikeEnum::MinusOne;
 
     let vsimpleenum = SimpleEnum::Two(83, 92);
+    let vsimpleenum1 = SimpleEnum::One{f1: 92, f2: 83};
     let voptenum = OptimizedEnum::Null;
 
     let vsimpleenum_ref = &vsimpleenum;

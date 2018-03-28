@@ -1020,7 +1020,6 @@ RustExpressionUP Parser::Term(Status &error) {
   case INTEGER: {
     const char *suffix = CurrentToken().number_suffix;
     if (!suffix) {
-      // FIXME
       suffix = "i64";
     }
     RustTypeExpressionUP type = llvm::make_unique<RustPathTypeExpression>(suffix);

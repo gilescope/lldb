@@ -114,6 +114,8 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(char) *vcharpointer = 'Q'", str(v))
         v = frame.EvaluateExpression("*vi8ref")
         self.assertEqual("(i8) *vi8ref = -23", str(v))
+        v = frame.EvaluateExpression("*&vi8")
+        self.assertEqual("(i8) *&vi8 = -23", str(v))
         v = frame.EvaluateExpression("*vu8ref")
         self.assertEqual("(u8) *vu8ref = 23", str(v))
         v = frame.EvaluateExpression("vsimpleenum.1")

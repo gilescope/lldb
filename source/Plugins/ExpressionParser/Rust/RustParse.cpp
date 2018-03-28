@@ -1060,7 +1060,9 @@ RustExpressionUP Parser::Term(Status &error) {
     break;
 
   case '&':
-    return Unimplemented(error);
+    // FIXME should handle slices here.
+    term = Unary<'&', UnaryAddr>(error);
+    break;
 
   case DOTDOT:
     return Unimplemented(error);

@@ -206,10 +206,7 @@ public:
     stream << "(" << m_left << " = " << m_right << ")";
   }
 
-  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("assignment unimplemented");
-    return lldb::ValueObjectSP();
-  }
+  lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 

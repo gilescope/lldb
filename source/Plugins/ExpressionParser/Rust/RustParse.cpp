@@ -501,6 +501,31 @@ RustTupleFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
+RustAssignment::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
+  if (!left) {
+    return left;
+  }
+
+  ValueObjectSP right = m_right->Evaluate(exe_ctx, error);
+  if (!right) {
+    return right;
+  }
+
+  DataExtractor data;
+  right->GetData(data, error);
+  if (error.Fail()) {
+    return ValueObjectSP();
+  }
+
+  if (!left->SetData(data, error)) {
+    return ValueObjectSP();
+  }
+
+  return left;
+}
+
+lldb::ValueObjectSP
 RustTupleExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 {
   error.SetErrorString("tuple expressions not supported");

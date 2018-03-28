@@ -587,8 +587,17 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("casts unimplemented");
-  return ValueObjectSP();
+  CompilerType type = m_type->Evaluate(exe_ctx, error);
+  if (!type) {
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP value = m_expr->Evaluate(exe_ctx, error);
+  if (!value) {
+    return value;
+  }
+
+  return value->Cast(type);
 }
 
 lldb::ValueObjectSP

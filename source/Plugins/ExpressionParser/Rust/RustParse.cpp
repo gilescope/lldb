@@ -157,7 +157,7 @@ lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, St
   return ValueObjectSP();
 }
 
-template<typename T>
+template<typename T, bool ASSIGN>
 ValueObjectSP
 lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
                                      lldb::ValueObjectSP right, Status &error)
@@ -217,7 +217,23 @@ lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjec
     return ValueObjectSP();
   }
 
-  return CreateValueFromScalar(exe_ctx, result, type, error);
+  ValueObjectSP result_obj = CreateValueFromScalar(exe_ctx, result, type, error);
+
+  if (ASSIGN) {
+    DataExtractor data;
+    result_obj->GetData(data, error);
+    if (error.Fail()) {
+      return ValueObjectSP();
+    }
+
+    if (!left->SetData(data, error)) {
+      return ValueObjectSP();
+    }
+
+    result_obj = left;
+  }
+
+  return result_obj;
 }
 
 template<typename T>
@@ -1149,11 +1165,11 @@ RustExpressionUP Parser::Term(Status &error) {
 }
 
 #define BINOP(Tag, What)                                        \
-  RustBinaryExpression< Tag, BinaryOperation< What<Scalar> > >
+  RustBinaryExpression< Tag, BinaryOperation< What<Scalar>, false > >
 #define COMP(Tag, What)                                         \
   RustBinaryExpression< Tag, Comparison< What<Scalar> > >
 #define ASSIGN(Tag, What)                                       \
-  RustAssignExpression< Tag, BinaryOperation< What<Scalar> > >
+  RustAssignExpression< Tag, BinaryOperation< What<Scalar>, true > >
 
 // Couldn't find these in <functional>.
 

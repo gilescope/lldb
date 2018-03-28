@@ -124,3 +124,11 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(u8) f2 = 83", str(v))
         v = frame.EvaluateExpression("vi8 = 7")
         self.assertEqual("(i8) vi8 = 7", str(v))
+        # Double check.
+        v = frame.EvaluateExpression("*&vi8")
+        self.assertEqual("(i8) *&vi8 = 7", str(v))
+        v = frame.EvaluateExpression("vi8 += 7")
+        self.assertEqual("(i8) vi8 = 14", str(v))
+        # Double check.
+        v = frame.EvaluateExpression("*&vi8")
+        self.assertEqual("(i8) *&vi8 = 14", str(v))

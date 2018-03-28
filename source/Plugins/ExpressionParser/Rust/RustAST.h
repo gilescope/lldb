@@ -38,7 +38,7 @@ lldb::ValueObjectSP UnaryComplement(ExecutionContext &exe_ctx, lldb::ValueObject
 lldb::ValueObjectSP UnarySizeof(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
 				Status &error);
 
-template<typename T>
+template<typename T, bool ASSIGN>
 lldb::ValueObjectSP BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
 				     lldb::ValueObjectSP right, Status &error);
 
@@ -176,7 +176,6 @@ public:
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    // FIXME
     lldb::ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
     if (!left)
       return left;

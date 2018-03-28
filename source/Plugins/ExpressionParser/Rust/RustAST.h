@@ -694,10 +694,7 @@ public:
     stream << "&[" << m_element << "]";
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("slice type lookup unimplemented");
-    return CompilerType();
-  }
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 
@@ -745,10 +742,7 @@ public:
     stream << "fn (" << m_arguments << ") -> " << m_result;
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("function type lookup unimplemented");
-    return CompilerType();
-  }
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 
@@ -768,10 +762,7 @@ public:
     stream << "(" << m_arguments << ")";
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
-    error.SetErrorString("tuple type lookup unimplemented");
-    return CompilerType();
-  }
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 

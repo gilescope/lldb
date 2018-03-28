@@ -534,8 +534,49 @@ RustArrayLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("array literals unimplemented");
-  return ValueObjectSP();
+  ValueObjectSP value = m_value->Evaluate(exe_ctx, error);
+  if (!value) {
+    return value;
+  }
+  ValueObjectSP length = m_length->Evaluate(exe_ctx, error);
+  if (!length) {
+    return length;
+  }
+  Scalar slength;
+  if (!length->ResolveValue(slength)) {
+    error.SetErrorString("could not resolve scalar value");
+    return ValueObjectSP();
+  }
+
+  RustASTContext *ast = GetASTContext(value, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+  CompilerType type = ast->CreateArrayType(value->GetCompilerType(), slength.UInt());
+  if (!type) {
+    error.SetErrorString("could not create array type");
+    return ValueObjectSP();
+  }
+
+  DataExtractor data;
+  value->GetData(data, error);
+  if (error.Fail()) {
+    return ValueObjectSP();
+  }
+
+  DataExtractor array_contents;
+  for (unsigned i = 0; i < slength.UInt(); ++i) {
+    if (!array_contents.Append(data)) {
+      error.SetErrorString("could not create array contents");
+      return ValueObjectSP();
+    }
+  }
+
+  ValueObjectSP result = ValueObject::CreateValueObjectFromData("", array_contents, exe_ctx, type);
+  if (!result) {
+    error.SetErrorString("could not create array value object");
+  }
+  return result;
 }
 
 lldb::ValueObjectSP

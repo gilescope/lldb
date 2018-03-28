@@ -522,37 +522,37 @@ RustAssignment::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustTupleExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("tuple expressions not supported");
+  error.SetErrorString("tuple expressions unimplemented");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
 RustArrayLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("array literals not supported");
+  error.SetErrorString("array literals unimplemented");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
 RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("array literals not supported");
+  error.SetErrorString("array literals unimplemented");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
 RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("function calls not supported");
+  error.SetErrorString("function calls unimplemented");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
 RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("casts not supported");
+  error.SetErrorString("casts unimplemented");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
 RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("struct expressions not supported");
+  error.SetErrorString("struct expressions unimplemented");
   return ValueObjectSP();
 }
 
@@ -621,6 +621,24 @@ RustPointerTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
   // FIXME references
   return target.GetPointerType();
+}
+
+CompilerType
+RustSliceTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  error.SetErrorString("slice type lookup unimplemented");
+  return CompilerType();
+}
+
+CompilerType
+RustFunctionTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  error.SetErrorString("function type lookup unimplemented");
+  return CompilerType();
+}
+
+CompilerType
+RustTupleTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  error.SetErrorString("tuple type lookup unimplemented");
+  return CompilerType();
 }
 
 ////////////////////////////////////////////////////////////////

@@ -24,8 +24,7 @@ using namespace lldb;
 using namespace llvm;
 
 static RustASTContext *
-GetASTContext(ValueObjectSP val, Status &error)
-{
+GetASTContext(ValueObjectSP val, Status &error) {
   RustASTContext *result =
     llvm::dyn_cast_or_null<RustASTContext>(val->GetCompilerType().GetTypeSystem());
   if (!result) {
@@ -35,8 +34,7 @@ GetASTContext(ValueObjectSP val, Status &error)
 }
 
 static RustASTContext *
-GetASTContext(ExecutionContext &ctxt, Status &error)
-{
+GetASTContext(ExecutionContext &ctxt, Status &error) {
   Target *target = ctxt.GetTargetPtr();
   TypeSystem *sys = target->GetScratchTypeSystemForLanguage(&error, eLanguageTypeRust);
   if (!sys) {
@@ -51,8 +49,7 @@ GetASTContext(ExecutionContext &ctxt, Status &error)
 
 static ValueObjectSP
 CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType type,
-		      Status &error)
-{
+		      Status &error) {
   DataExtractor data;
   if (!scalar.GetData(data)) {
     error.SetErrorString("could not get data from scalar");
@@ -66,20 +63,17 @@ CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType ty
 }
 
 ValueObjectSP
-lldb_private::rust::UnaryDereference(ExecutionContext &exe_ctx, ValueObjectSP addr, Status &error)
-{
+lldb_private::rust::UnaryDereference(ExecutionContext &exe_ctx, ValueObjectSP addr, Status &error) {
   return addr->Dereference(error);
 }
 
 ValueObjectSP
-lldb_private::rust::UnaryAddr(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
-{
+lldb_private::rust::UnaryAddr(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
   return val->AddressOf(error);
 }
 
 ValueObjectSP
-lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
-{
+lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
   if (RustASTContext *ast = GetASTContext(val, error)) {
     CompilerType type = val->GetCompilerType();
     if (type.IsScalarType() && !ast->IsBooleanType(type.GetOpaqueQualType())) {
@@ -91,8 +85,7 @@ lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Stat
 }
 
 ValueObjectSP
-lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
-{
+lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
   if (RustASTContext *ast = GetASTContext(val, error)) {
     CompilerType type = val->GetCompilerType();
     if (!type.IsScalarType() || ast->IsBooleanType(type.GetOpaqueQualType())) {
@@ -116,8 +109,7 @@ lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, St
 }
 
 ValueObjectSP
-lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
-{
+lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
   RustASTContext *ast = GetASTContext(val, error);
   if (!ast) {
     return ValueObjectSP();
@@ -146,8 +138,7 @@ lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val
 }
 
 ValueObjectSP
-lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error)
-{
+lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
   if (RustASTContext *ast = GetASTContext(val, error)) {
     uint32_t ptr_size = ast->GetPointerByteSize();
     CompilerType type = ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
@@ -160,8 +151,7 @@ lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, St
 template<typename T, bool ASSIGN>
 ValueObjectSP
 lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-                                     lldb::ValueObjectSP right, Status &error)
-{
+                                     lldb::ValueObjectSP right, Status &error) {
   RustASTContext *ast = GetASTContext(left, error);
   if (!ast) {
     return ValueObjectSP();
@@ -239,8 +229,7 @@ lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjec
 template<typename T>
 ValueObjectSP
 lldb_private::rust::Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-                                lldb::ValueObjectSP right, Status &error)
-{
+                                lldb::ValueObjectSP right, Status &error) {
   RustASTContext *ast = GetASTContext(left, error);
   if (!ast) {
     return ValueObjectSP();
@@ -266,8 +255,7 @@ lldb_private::rust::Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
 
 ValueObjectSP
 lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-                                lldb::ValueObjectSP right, Status &error)
-{
+                                lldb::ValueObjectSP right, Status &error) {
   if (!right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
@@ -295,8 +283,7 @@ lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
 }
 
 lldb::ValueObjectSP
-RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   CompilerType type = m_type->Evaluate(exe_ctx, error);
   if (!type) {
     return ValueObjectSP();
@@ -305,8 +292,7 @@ RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
@@ -318,8 +304,7 @@ RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
@@ -336,16 +321,14 @@ RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   // FIXME.
   error.SetErrorString("string literals unimplemented");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
-RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   Target *target = exe_ctx.GetTargetPtr();
   if (!target) {
     error.SetErrorString("could not get target to look up item");
@@ -401,8 +384,7 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
   if (!vleft) {
     return vleft;
@@ -437,8 +419,7 @@ RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
   if (!vleft) {
     return vleft;
@@ -473,8 +454,7 @@ RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
   if (!left) {
     return left;
@@ -495,8 +475,7 @@ RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
 }
 
 lldb::ValueObjectSP
-RustTupleFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustTupleFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
   if (!left) {
     return left;
@@ -542,43 +521,37 @@ RustAssignment::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 }
 
 lldb::ValueObjectSP
-RustTupleExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustTupleExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   error.SetErrorString("tuple expressions not supported");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
-RustArrayLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustArrayLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   error.SetErrorString("array literals not supported");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
-RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   error.SetErrorString("array literals not supported");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
-RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   error.SetErrorString("function calls not supported");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
-RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   error.SetErrorString("casts not supported");
   return ValueObjectSP();
 }
 
 lldb::ValueObjectSP
-RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error)
-{
+RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   error.SetErrorString("struct expressions not supported");
   return ValueObjectSP();
 }

@@ -42,6 +42,7 @@ enum TokenKind {
   FN,
   SIZEOF,
   DOTDOT,
+  DOTDOTEQ,
   OROR,
   ANDAND,
   EQEQ,

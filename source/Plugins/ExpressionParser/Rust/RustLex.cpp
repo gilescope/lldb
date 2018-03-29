@@ -47,6 +47,10 @@ void lldb_private::rust::PrintTokenKind(Stream &stream, int kind) {
       stream << "..";
       break;
 
+    case DOTDOTEQ:
+      stream << "..=";
+      break;
+
     case OROR:
       stream << "||";
       break;
@@ -621,6 +625,7 @@ Token Lexer::String(bool is_byte) {
     m["fn"] = FN;
     m["sizeof"] = SIZEOF;
     m[".."] = DOTDOT;
+    m["..="] = DOTDOT;
     m["||"] = OROR;
     m["|="] = OR_EQ;
     m["&&"] = ANDAND;

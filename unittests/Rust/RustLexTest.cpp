@@ -45,6 +45,7 @@ TEST(RustLexTest, Keywords) {
   TestSingle("fn", Token(FN));
   TestSingle("sizeof", Token(SIZEOF));
   TestSingle("..", Token(DOTDOT));
+  TestSingle("..=", Token(DOTDOTEQ));
   TestSingle("||", Token(OROR));
   TestSingle("|=", Token(OR_EQ));
   TestSingle("&&", Token(ANDAND));

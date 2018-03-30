@@ -273,7 +273,7 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "(" << m_left << " .. " << m_right << ")";
+    stream << "(" << m_left << (m_inclusive ? " ..= " : " .. ") << m_right << ")";
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;

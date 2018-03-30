@@ -227,6 +227,8 @@ bool Lexer::BasicInteger(int *radix_out, std::string *value) {
       radix = 8;
       need_digit = true;
       ++m_iter;
+    } else {
+      value->push_back('0');
     }
   }
 
@@ -625,7 +627,7 @@ Token Lexer::String(bool is_byte) {
     m["fn"] = FN;
     m["sizeof"] = SIZEOF;
     m[".."] = DOTDOT;
-    m["..="] = DOTDOT;
+    m["..="] = DOTDOTEQ;
     m["||"] = OROR;
     m["|="] = OR_EQ;
     m["&&"] = ANDAND;

@@ -701,7 +701,9 @@ RustTupleTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 // Output
 
 Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) {
-  expr->print(stream);
+  if (expr) {
+    expr->print(stream);
+  }
   return stream;
 }
 
@@ -1063,8 +1065,41 @@ RustExpressionUP Parser::Sizeof(Status &error) {
   return llvm::make_unique<RustUnaryExpression<'@', UnarySizeof>>(std::move(expr));
 }
 
+bool Parser::StartsTerm() {
+  // Must be kept in parallel with the switch in Term.
+  switch (CurrentToken().kind) {
+  case INTEGER:
+  case FLOAT:
+  case STRING:
+  case BYTESTRING:
+  case CHAR:
+  case BYTE:
+  case TRUE:
+  case FALSE:
+  case '[':
+  case '(':
+  case SUPER:
+  case SELF:
+  case IDENTIFIER:
+  case COLONCOLON:
+  case SIZEOF:
+  case '*':
+  case '+':
+  case '-':
+  case '!':
+  case '&':
+    return true;
+
+  default:
+    return false;
+  }
+}
+
 RustExpressionUP Parser::Term(Status &error) {
   RustExpressionUP term;
+
+  // Double-check StartsTerm.
+  bool starts = StartsTerm();
 
   switch (CurrentToken().kind) {
   case INTEGER: {
@@ -1125,6 +1160,7 @@ RustExpressionUP Parser::Term(Status &error) {
     break;
 
   case SIZEOF:
+    assert(starts);
     return Sizeof(error);
 
   case '*':
@@ -1146,17 +1182,22 @@ RustExpressionUP Parser::Term(Status &error) {
     break;
 
   case INVALID:
+    assert(!starts);
     error.SetErrorString(CurrentToken().str);
     return RustExpressionUP();
 
   case THATSALLFOLKS:
+    assert(!starts);
     error.SetErrorString("unexpected EOF");
     return RustExpressionUP();
 
   default:
+    assert(!starts);
     error.SetErrorString("unexpected token");
     return RustExpressionUP();
   }
+
+  assert(starts);
 
   bool done = false;
   while (!done) {
@@ -1349,15 +1390,20 @@ RustExpressionUP Parser::Range(Status &error) {
     }
   }
 
-  bool is_inclusive = CurrentToken().kind == DOTDOTEQ;
-  if (CurrentToken().kind != DOTDOT && !is_inclusive) {
+  if (CurrentToken().kind != DOTDOT && CurrentToken().kind != DOTDOTEQ) {
     return lhs;
   }
+  bool is_inclusive = CurrentToken().kind == DOTDOTEQ;
   Advance();
 
-  RustExpressionUP rhs = Binary(error);
-  if (!rhs) {
-    return rhs;
+  // An inclusive range requires an expression, but an exclusive range
+  // does not.
+  RustExpressionUP rhs;
+  if (is_inclusive || StartsTerm()) {
+    rhs = Binary(error);
+    if (!rhs) {
+      return rhs;
+    }
   }
 
   return llvm::make_unique<RustRangeExpression>(std::move(lhs), std::move(rhs), is_inclusive);

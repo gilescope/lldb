@@ -269,7 +269,7 @@ public:
       m_inclusive(inclusive)
   {
     // Inclusive ranges require an upper bound.
-    assert(right || !inclusive);
+    assert(m_right || !m_inclusive);
   }
 
   void print(Stream &stream) override {

@@ -36,6 +36,7 @@ public:
 
 private:
 
+  bool StartsTerm();
   template<char C, RustUnaryOperator OP> RustExpressionUP Unary(Status &error);
   bool ExprList(std::vector<RustExpressionUP> *exprs, Status &error);
   RustExpressionUP Parens(Status &error);

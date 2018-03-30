@@ -109,3 +109,14 @@ TEST(RustParseTest, Types) {
   TestParse("x as fn(u32, u32)->()", "(x as fn (u32, u32) -> ())");
   TestParse("x as *const [mod::whatever<bool>; 8]", "(x as *const [mod::whatever<bool>; 8])");
 }
+
+TEST(RustParseTest, Ranges) {
+  TestParse("0..32", "(0 .. 32)");
+  TestParse("..32", "( .. 32)");
+  TestParse("0..", "(0 .. )");
+  TestParse("..", "( .. )");
+  TestParse("0..=32", "(0 ..= 32)");
+  TestParse("..=32", "( ..= 32)");
+  TestParse("a+b*c..d%e", "((a + (b * c)) .. (d % e))");
+  TestParse("&array[52..]", "& ((array @ (52 .. )))");
+}

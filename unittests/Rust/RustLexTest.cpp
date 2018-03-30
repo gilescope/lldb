@@ -163,4 +163,9 @@ TEST(RustLexTest, Streams) {
       Token(AS),
       Token(IDENTIFIER, "i64")
       });
+
+  TestLex("0..", std::array<Token, 2> {
+      Token(INTEGER, uint64_t(0)),
+      Token(DOTDOT)
+      });
 }

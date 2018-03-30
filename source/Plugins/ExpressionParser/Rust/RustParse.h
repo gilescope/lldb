@@ -31,7 +31,7 @@ public:
   }
 
   RustExpressionUP Expr(Status &error) {
-    return Binary(error);
+    return Range(error);
   }
 
 private:
@@ -48,6 +48,7 @@ private:
   RustExpressionUP Binary(Status &error);
   RustExpressionUP Sizeof(Status &error);
   RustExpressionUP Struct(RustPathExpressionUP &&path, Status &error);
+  RustExpressionUP Range(Status &error);
 
   RustTypeExpressionUP Type(Status &error);
   RustTypeExpressionUP ArrayType(Status &error);
@@ -66,8 +67,6 @@ private:
   // There's one case where we need to push-back, but we don't need
   // full generality so there's just this little hack.
   void ReplaceTokenKind(int k) { m_current.kind = k; }
-
-  RustExpressionUP Unimplemented(Status &error);
 
   lldb::TargetSP m_target;
   Lexer m_lexer;

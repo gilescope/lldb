@@ -262,10 +262,14 @@ public:
 
   // Either or both can be NULL here.
   RustRangeExpression(RustExpressionUP &&left,
-		      RustExpressionUP &&right)
+		      RustExpressionUP &&right,
+                      bool inclusive)
     : m_left(std::move(left)),
-      m_right(std::move(right))
+      m_right(std::move(right)),
+      m_inclusive(inclusive)
   {
+    // Inclusive ranges require an upper bound.
+    assert(right || !inclusive);
   }
 
   void print(Stream &stream) override {
@@ -278,6 +282,7 @@ private:
 
   RustExpressionUP m_left;
   RustExpressionUP m_right;
+  bool m_inclusive;
 };
 
 class RustFieldExpression : public RustExpression {

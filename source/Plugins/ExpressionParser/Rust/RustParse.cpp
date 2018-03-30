@@ -606,6 +606,12 @@ RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return ValueObjectSP();
 }
 
+lldb::ValueObjectSP
+RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  error.SetErrorString("range expressions unimplemented");
+  return ValueObjectSP();
+}
+
 ////////////////////////////////////////////////////////////////
 // Types
 
@@ -721,12 +727,6 @@ Stream &lldb_private::operator<< (Stream &stream,
 
 ////////////////////////////////////////////////////////////////
 // The parser
-
-// temporary
-RustExpressionUP Parser::Unimplemented(Status &error) {
-  error.SetErrorString("parser production unimplemented");
-  return RustExpressionUP();
-}
 
 template<char C, RustUnaryOperator OP>
 RustExpressionUP Parser::Unary(Status &error) {
@@ -1145,9 +1145,6 @@ RustExpressionUP Parser::Term(Status &error) {
     term = Unary<'&', UnaryAddr>(error);
     break;
 
-  case DOTDOT:
-    return Unimplemented(error);
-
   case INVALID:
     error.SetErrorString(CurrentToken().str);
     return RustExpressionUP();
@@ -1173,11 +1170,6 @@ RustExpressionUP Parser::Term(Status &error) {
       term = llvm::make_unique<RustCast>(std::move(type), std::move(term));
       break;
     }
-
-    case DOTDOT:
-      // term = Range(std::move(term), error);
-      term = Unimplemented(error);
-      break;
 
     case '.':
       term = Field(std::move(term), error);
@@ -1346,6 +1338,29 @@ RustExpressionUP Parser::Binary(Status &error) {
 
   assert(operations.size() == 1);
   return std::move(operations.back().term);
+}
+
+RustExpressionUP Parser::Range(Status &error) {
+  RustExpressionUP lhs;
+  if (CurrentToken().kind != DOTDOT && CurrentToken().kind != DOTDOTEQ) {
+    lhs = Binary(error);
+    if (!lhs) {
+      return lhs;
+    }
+  }
+
+  bool is_inclusive = CurrentToken().kind == DOTDOTEQ;
+  if (CurrentToken().kind != DOTDOT && !is_inclusive) {
+    return lhs;
+  }
+  Advance();
+
+  RustExpressionUP rhs = Binary(error);
+  if (!rhs) {
+    return rhs;
+  }
+
+  return llvm::make_unique<RustRangeExpression>(std::move(lhs), std::move(rhs), is_inclusive);
 }
 
 ////////////////////////////////////////////////////////////////

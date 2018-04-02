@@ -322,6 +322,30 @@ RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  if (!ast) {
+    return ValueObjectSP();
+  }
+
+  CompilerType u8 = ast->CreateIntegralType(ConstString("u8"), false, 1);
+  CompilerType type = ast->CreateArrayType(u8, m_value.size());
+  if (!type) {
+    error.SetErrorString("could not create array type");
+    return ValueObjectSP();
+  }
+
+  // Byte order and address size don't matter here.
+  DataExtractor data(m_value.c_str(), m_value.size(), eByteOrderInvalid, 4);
+  ValueObjectSP array = ValueObject::CreateValueObjectFromData("", data, exe_ctx, type);
+  if (!array) {
+    error.SetErrorString("could not create array value object");
+    return array;
+  }
+
+  if (m_is_byte) {
+    return array;
+  }
+
   // FIXME.
   error.SetErrorString("string literals unimplemented");
   return ValueObjectSP();

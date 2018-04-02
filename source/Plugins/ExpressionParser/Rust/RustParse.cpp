@@ -711,8 +711,26 @@ RustSliceTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 CompilerType
 RustFunctionTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("function type lookup unimplemented");
-  return CompilerType();
+  RustASTContext *context = GetASTContext(exe_ctx, error);
+  if (!context) {
+    return CompilerType();
+  }
+
+  CompilerType ret = m_result->Evaluate(exe_ctx, error);
+  if (!ret) {
+    return ret;
+  }
+
+  std::vector<CompilerType> args;
+  for (const RustTypeExpressionUP &arg : m_arguments) {
+    CompilerType argtype = arg->Evaluate(exe_ctx, error);
+    if (!argtype) {
+      return argtype;
+    }
+    args.push_back(argtype);
+  }
+
+  return context->CreateFunctionType(ConstString(""), ret, std::move(args));
 }
 
 CompilerType

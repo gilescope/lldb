@@ -690,13 +690,14 @@ private:
 class RustSliceTypeExpression : public RustTypeExpression {
 public:
 
-  RustSliceTypeExpression(RustTypeExpressionUP &&element)
-    : m_element(std::move(element))
+  RustSliceTypeExpression(RustTypeExpressionUP &&element, bool is_mut)
+    : m_element(std::move(element)),
+      m_is_mut(is_mut)
   {
   }
 
   void print(Stream &stream) override {
-    stream << "&[" << m_element << "]";
+    stream << "&" << (m_is_mut ? "mut " : "") << "[" << m_element << "]";
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
@@ -704,6 +705,7 @@ public:
 private:
 
   RustTypeExpressionUP m_element;
+  bool m_is_mut;
 };
 
 class RustPointerTypeExpression : public RustTypeExpression {
@@ -718,7 +720,7 @@ public:
 
   void print(Stream &stream) override {
     if (m_is_ref) {
-      stream << "&" << m_target;
+      stream << "&" << (m_is_ref ? "mut " : "") << m_target;
     } else {
       stream << "*" << (m_is_mut ? "mut " : "const ") << m_target;
     }

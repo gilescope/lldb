@@ -106,6 +106,9 @@ TEST(RustParseTest, Types) {
   TestParse("x as (u32, u32, u32)", "(x as (u32, u32, u32))");
   TestParse("x as [bool;7]", "(x as [bool; 7])");
   TestParse("x as &[f64]", "(x as &[f64])");
+  TestParse("x as &mut [f64]", "(x as &mut [f64])");
+  TestParse("x as &mut f64", "(x as &mut f64)");
+  TestParse("x as *mut f64", "(x as *mut f64)");
   TestParse("x as fn(u32, u32)->()", "(x as fn (u32, u32) -> ())");
   TestParse("x as *const [mod::whatever<bool>; 8]", "(x as *const [mod::whatever<bool>; 8])");
 }

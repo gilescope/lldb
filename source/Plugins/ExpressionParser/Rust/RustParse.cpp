@@ -1473,6 +1473,12 @@ RustTypeExpressionUP Parser::ReferenceType(Status &error) {
   assert(CurrentToken().kind == '&');
   Advance();
 
+  bool is_mut = false;
+  if (CurrentToken().kind == MUT) {
+    is_mut = true;
+    Advance();
+  }
+
   bool is_slice = false;
   if (CurrentToken().kind == '[') {
     is_slice = true;
@@ -1491,10 +1497,10 @@ RustTypeExpressionUP Parser::ReferenceType(Status &error) {
     }
     Advance();
 
-    return llvm::make_unique<RustSliceTypeExpression>(std::move(target));
+    return llvm::make_unique<RustSliceTypeExpression>(std::move(target), is_mut);
   }
 
-  return llvm::make_unique<RustPointerTypeExpression>(std::move(target), true);
+  return llvm::make_unique<RustPointerTypeExpression>(std::move(target), true, is_mut);
 }
 
 RustTypeExpressionUP Parser::PointerType(Status &error) {

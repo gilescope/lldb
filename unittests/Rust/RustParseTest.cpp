@@ -21,7 +21,7 @@ TestParse(const char *input, const char *expected) {
   Parser parser(nullptr, input);
 
   Status error;
-  RustExpressionUP result = parser.Expr(error);
+  RustExpressionUP result = parser.ParseFully(error);
 
   if (expected == nullptr) {
     EXPECT_EQ(result.get(), nullptr) << "expected failure for "

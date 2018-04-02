@@ -963,6 +963,7 @@ RustExpressionUP Parser::Struct(RustPathExpressionUP &&path, Status &error) {
     error.SetErrorString("'}' expected");
     return RustExpressionUP();
   }
+  Advance();
 
   return llvm::make_unique<RustStructExpression>(std::move(path), std::move(inits),
                                                  std::move(copy));

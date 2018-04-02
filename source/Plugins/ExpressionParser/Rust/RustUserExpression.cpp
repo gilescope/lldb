@@ -28,7 +28,7 @@ bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
 
   Parser parser(exe_ctx.GetTargetSP(), m_expr_text);
   Status status;
-  m_expr = parser.Expr(status);
+  m_expr = parser.ParseFully(status);
   if (!m_expr) {
     diagnostic_manager.PutString(eDiagnosticSeverityError, status.AsCString());
     return false;

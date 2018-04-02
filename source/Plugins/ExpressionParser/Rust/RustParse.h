@@ -30,8 +30,13 @@ public:
   {
   }
 
-  RustExpressionUP Expr(Status &error) {
-    return Range(error);
+  RustExpressionUP ParseFully(Status &error) {
+    RustExpressionUP result = Expr(error);
+    if (CurrentToken().kind != THATSALLFOLKS) {
+      error.SetErrorString("extra tokens at EOF");
+      return RustExpressionUP();
+    }
+    return result;
   }
 
 private:
@@ -50,6 +55,11 @@ private:
   RustExpressionUP Sizeof(Status &error);
   RustExpressionUP Struct(RustPathExpressionUP &&path, Status &error);
   RustExpressionUP Range(Status &error);
+
+  RustExpressionUP Expr(Status &error) {
+    return Range(error);
+  }
+
 
   RustTypeExpressionUP Type(Status &error);
   RustTypeExpressionUP ArrayType(Status &error);

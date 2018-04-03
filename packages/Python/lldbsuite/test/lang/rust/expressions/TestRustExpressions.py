@@ -141,3 +141,7 @@ class TestRustExpressions(TestBase):
         # FIXME need pretty-printing for &str
         # v = frame.EvaluateExpression('"hi"')
         # self.assertEqual("fixme", str(v))
+        v = frame.EvaluateExpression("Struct { field1: 8, field2: 'c'}")
+        self.assertEqual("(Struct) * = (field1 = 8, field2 = 'c')", str(v))
+        v = frame.EvaluateExpression("Struct { field1: 8, .. vstruct}")
+        self.assertEqual("(Struct) * = (field1 = 8, field2 = 'Q')", str(v))

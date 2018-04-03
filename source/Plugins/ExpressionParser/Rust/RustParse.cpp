@@ -87,7 +87,23 @@ SetField(const ValueObjectSP &object, const char *name, uint64_t value, Status &
   DataExtractor data;
   if (!scalar.GetData(data)) {
     error.SetErrorString("could not get data from scalar");
-    return ValueObjectSP();
+    return false;
+  }
+
+  ValueObjectSP child = object->GetChildMemberWithName(ConstString(name), true);
+  if (!child) {
+    error.SetErrorStringWithFormat("could not find child named \"%s\"", name);
+    return false;
+  }
+  return child->SetData(data, error);
+}
+
+static bool
+SetField(const ValueObjectSP &object, const char *name, const ValueObjectSP &value,
+         Status &error) {
+  DataExtractor data;
+  if (!value->GetData(data, error)) {
+    return false;
   }
 
   ValueObjectSP child = object->GetChildMemberWithName(ConstString(name), true);
@@ -698,8 +714,57 @@ RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("struct expressions unimplemented");
-  return ValueObjectSP();
+  CompilerType type = m_path->Evaluate(exe_ctx, error);
+  if (!type) {
+    return ValueObjectSP();
+  }
+  // FIXME could tighten this to really ensure it is a struct and not
+  // an enum or tuple.
+  if (!type.IsAggregateType() || type.IsArrayType(nullptr, nullptr, nullptr)) {
+    error.SetErrorStringWithFormat("type \"%s\" is not a structure type",
+                                   type.GetDisplayTypeName().AsCString());
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP result = CreateValueInMemory(exe_ctx, type, error);
+  if (!result) {
+    return result;
+  }
+
+  if (m_copy) {
+    ValueObjectSP copy = m_copy->Evaluate(exe_ctx, error);
+    if (!copy) {
+      return copy;
+    }
+
+    DataExtractor data;
+    copy->GetData(data, error);
+    if (error.Fail()) {
+      return ValueObjectSP();
+    }
+
+    if (!result->SetData(data, error)) {
+      return ValueObjectSP();
+    }
+  } else {
+    if (m_inits.size() != type.GetNumFields()) {
+      error.SetErrorStringWithFormat("some initializers missing for \"%s\"",
+                                     type.GetDisplayTypeName().AsCString());
+      return ValueObjectSP();
+    }
+  }
+
+  for (const auto &init : m_inits) {
+    ValueObjectSP init_val = init.second->Evaluate(exe_ctx, error);
+    if (!init_val) {
+      return init_val;
+    }
+    if (!SetField(result, init.first.c_str(), init_val, error)) {
+      return ValueObjectSP();
+    }
+  }
+
+  return result;
 }
 
 lldb::ValueObjectSP
@@ -803,11 +868,6 @@ Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) 
   if (expr) {
     expr->print(stream);
   }
-  return stream;
-}
-
-Stream &lldb_private::operator<< (Stream &stream, const RustPathExpressionUP &expr) {
-  expr->print(stream);
   return stream;
 }
 
@@ -1007,7 +1067,7 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
                                                                   std::move(idx));
 }
 
-RustExpressionUP Parser::Struct(RustPathExpressionUP &&path, Status &error) {
+RustExpressionUP Parser::Struct(RustTypeExpressionUP &&path, Status &error) {
   assert(CurrentToken().kind == '{');
   Advance();
 
@@ -1036,6 +1096,8 @@ RustExpressionUP Parser::Struct(RustPathExpressionUP &&path, Status &error) {
           return value;
         }
       }
+
+      // FIXME look for duplicates.
 
       inits.emplace_back(std::move(field), std::move(value));
     } else if (CurrentToken().kind == DOTDOT) {
@@ -1130,15 +1192,15 @@ RustExpressionUP Parser::Path(Status &error) {
     return RustExpressionUP();
   }
 
-  RustPathExpressionUP result =
-    llvm::make_unique<RustPathExpression>(relative, supers, std::move(path),
-                                          std::move(type_list));
-
   if (CurrentToken().kind == '{') {
-    return Struct(std::move(result), error);
+    RustTypeExpressionUP type_path =
+      llvm::make_unique<RustPathTypeExpression>(relative, supers, std::move(path),
+                                                std::move(type_list), true);
+    return Struct(std::move(type_path), error);
   }
 
-  return result;
+  return llvm::make_unique<RustPathExpression>(relative, supers, std::move(path),
+                                               std::move(type_list));
 }
 
 RustExpressionUP Parser::Sizeof(Status &error) {

@@ -53,7 +53,7 @@ private:
   RustExpressionUP Term(Status &error);
   RustExpressionUP Binary(Status &error);
   RustExpressionUP Sizeof(Status &error);
-  RustExpressionUP Struct(RustPathExpressionUP &&path, Status &error);
+  RustExpressionUP Struct(RustTypeExpressionUP &&path, Status &error);
   RustExpressionUP Range(Status &error);
 
   RustExpressionUP Expr(Status &error) {

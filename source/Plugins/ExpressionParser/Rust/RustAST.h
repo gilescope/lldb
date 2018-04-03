@@ -57,11 +57,7 @@ typedef std::unique_ptr<RustExpression> RustExpressionUP;
 class RustTypeExpression;
 typedef std::unique_ptr<RustTypeExpression> RustTypeExpressionUP;
 
-class RustPathExpression;
-typedef std::unique_ptr<RustPathExpression> RustPathExpressionUP;
-
 Stream &operator<< (Stream &stream, const RustExpressionUP &expr);
-Stream &operator<< (Stream &stream, const RustPathExpressionUP &expr);
 Stream &operator<< (Stream &stream, const RustTypeExpressionUP &type);
 Stream &operator<< (Stream &stream, const Scalar &value);
 Stream &operator<< (Stream &stream, const std::pair<std::string, RustExpressionUP> &value);
@@ -575,7 +571,7 @@ class RustStructExpression : public RustExpression {
 public:
 
   // Note that |copy| can be null if no '..' form was seen.
-  RustStructExpression(RustPathExpressionUP &&path,
+  RustStructExpression(RustTypeExpressionUP &&path,
                        std::vector<std::pair<std::string, RustExpressionUP>> &&inits,
                        RustExpressionUP &&copy)
     : m_path(std::move(path)),
@@ -596,7 +592,7 @@ public:
 
 private:
 
-  RustPathExpressionUP m_path;
+  RustTypeExpressionUP m_path;
   std::vector<std::pair<std::string, RustExpressionUP>> m_inits;
   RustExpressionUP m_copy;
 };
@@ -620,11 +616,13 @@ class RustPathTypeExpression : public RustTypeExpression {
 public:
 
   RustPathTypeExpression(bool relative, int supers, std::vector<std::string> &&path,
-                         std::vector<RustTypeExpressionUP> &&generic_params)
+                         std::vector<RustTypeExpressionUP> &&generic_params,
+                         bool for_expr = false)
     : m_relative(relative),
       m_supers(supers),
       m_path(std::move(path)),
-      m_generic_params(std::move(generic_params))
+      m_generic_params(std::move(generic_params)),
+      m_for_expr(for_expr)
   {
   }
 
@@ -652,6 +650,9 @@ public:
     }
 
     if (!m_generic_params.empty()) {
+      if (m_for_expr) {
+        stream << "::";
+      }
       stream << "<" << m_generic_params << ">";
     }
   }
@@ -664,6 +665,7 @@ private:
   int m_supers;
   std::vector<std::string> m_path;
   std::vector<RustTypeExpressionUP> m_generic_params;
+  bool m_for_expr;
 };
 
 class RustArrayTypeExpression : public RustTypeExpression {

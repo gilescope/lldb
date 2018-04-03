@@ -137,4 +137,7 @@ class TestRustExpressions(TestBase):
         v = frame.EvaluateExpression("23 as u8")
         self.assertEqual("(u8)  = 23", str(v))
         v = frame.EvaluateExpression('b"hi"')
-        self.assertEqual("([u8; 2])  = ([0] = 104, [1] = 105)", str(v))
+        self.assertEqual("([u8; 2]) * = ([0] = 104, [1] = 105)", str(v))
+        # FIXME need pretty-printing for &str
+        # v = frame.EvaluateExpression('"hi"')
+        # self.assertEqual("fixme", str(v))

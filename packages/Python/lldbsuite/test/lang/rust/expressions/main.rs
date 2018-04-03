@@ -72,6 +72,9 @@ fn main() {
     let vsimpleenum1 = SimpleEnum::One{f1: 92, f2: 83};
     let voptenum = OptimizedEnum::Null;
 
+    let vbstr = b"bytes";
+    let vstr = "string";
+
     let vsimpleenum_ref = &vsimpleenum;
 
     do_nothing();               // breakpoint

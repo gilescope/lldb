@@ -62,6 +62,62 @@ CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType ty
   return result;
 }
 
+static ValueObjectSP
+CreateValueInMemory(ExecutionContext &exe_ctx, CompilerType type, Status &error) {
+  if (!exe_ctx.HasProcessScope()) {
+    error.SetErrorString("need a running inferior to evaluate this");
+    return ValueObjectSP();
+  }
+
+  Process *proc = exe_ctx.GetProcessPtr();
+  uint64_t size = type.GetByteSize(proc);
+  addr_t addr = proc->AllocateMemory(size,
+                                     lldb::ePermissionsWritable | lldb::ePermissionsReadable,
+                                     error);
+  if (addr == LLDB_INVALID_ADDRESS) {
+    return ValueObjectSP();
+  }
+
+  return ValueObject::CreateValueObjectFromAddress("", addr, exe_ctx, type);
+}
+
+static bool
+SetField(const ValueObjectSP &object, const char *name, uint64_t value, Status &error) {
+  Scalar scalar(value);
+  DataExtractor data;
+  if (!scalar.GetData(data)) {
+    error.SetErrorString("could not get data from scalar");
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP child = object->GetChildMemberWithName(ConstString(name), true);
+  if (!child) {
+    error.SetErrorStringWithFormat("could not find child named \"%s\"", name);
+    return false;
+  }
+  return child->SetData(data, error);
+}
+
+static CompilerType
+GetTypeByName(ExecutionContext &exe_ctx, const char *name, Status &error) {
+  Target *target = exe_ctx.GetTargetPtr();
+  if (!target) {
+    error.SetErrorString("could not get target to look up type");
+    return CompilerType();
+  }
+
+  SymbolContext sc;
+  TypeList type_list;
+  llvm::DenseSet<SymbolFile *> searched_symbol_files;
+  uint32_t num_matches = target->GetImages().FindTypes(sc, ConstString(name), false,
+                                                       2, searched_symbol_files, type_list);
+  if (num_matches > 0) {
+    return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
+  }
+  error.SetErrorStringWithFormat("could not find type \"%s\"", name);
+  return CompilerType();
+}
+
 ValueObjectSP
 lldb_private::rust::UnaryDereference(ExecutionContext &exe_ctx, ValueObjectSP addr, Status &error) {
   return addr->Dereference(error);
@@ -328,27 +384,43 @@ RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
 
   CompilerType u8 = ast->CreateIntegralType(ConstString("u8"), false, 1);
-  CompilerType type = ast->CreateArrayType(u8, m_value.size());
-  if (!type) {
+  CompilerType array_type = ast->CreateArrayType(u8, m_value.size());
+  if (!array_type) {
     error.SetErrorString("could not create array type");
     return ValueObjectSP();
   }
 
   // Byte order and address size don't matter here.
   DataExtractor data(m_value.c_str(), m_value.size(), eByteOrderInvalid, 4);
-  ValueObjectSP array = ValueObject::CreateValueObjectFromData("", data, exe_ctx, type);
+  ValueObjectSP array = CreateValueInMemory(exe_ctx, array_type, error);
   if (!array) {
-    error.SetErrorString("could not create array value object");
     return array;
+  }
+
+  if (!array->SetData(data, error)) {
+    return ValueObjectSP();
   }
 
   if (m_is_byte) {
     return array;
   }
 
-  // FIXME.
-  error.SetErrorString("string literals unimplemented");
-  return ValueObjectSP();
+  CompilerType str_type = GetTypeByName(exe_ctx, "&str", error);
+  if (!str_type) {
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP str_val = CreateValueInMemory(exe_ctx, str_type, error);
+  if (!str_val) {
+    return str_val;
+  }
+
+  if (!SetField(str_val, "data_ptr", array->GetAddressOf(), error) ||
+      !SetField(str_val, "length", m_value.size(), error)) {
+    return ValueObjectSP();
+  }
+
+  return str_val;
 }
 
 lldb::ValueObjectSP
@@ -641,12 +713,6 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 CompilerType
 RustPathTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  Target *target = exe_ctx.GetTargetPtr();
-  if (!target) {
-    error.SetErrorString("could not get target to look up type");
-    return CompilerType();
-  }
-
   // FIXME must support super, generic params, and also handle
   // relative case more correctly
   if (m_supers) {
@@ -666,16 +732,7 @@ RustPathTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     }
   }
 
-  SymbolContext sc;
-  TypeList type_list;
-  llvm::DenseSet<SymbolFile *> searched_symbol_files;
-  uint32_t num_matches = target->GetImages().FindTypes(
-      sc, ConstString(fullname.c_str()), false, 2, searched_symbol_files, type_list);
-  if (num_matches > 0) {
-    return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
-  }
-  error.SetErrorStringWithFormat("could not find type \"%s\"", fullname.c_str());
-  return CompilerType();
+  return GetTypeByName(exe_ctx, fullname.c_str(), error);
 }
 
 CompilerType

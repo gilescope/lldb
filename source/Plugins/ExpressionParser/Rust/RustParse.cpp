@@ -1267,7 +1267,7 @@ RustExpressionUP Parser::Term(Status &error) {
   case INTEGER: {
     const char *suffix = CurrentToken().number_suffix;
     if (!suffix) {
-      suffix = "i64";
+      suffix = "i32";
     }
     RustTypeExpressionUP type = llvm::make_unique<RustPathTypeExpression>(suffix);
     term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), std::move(type));

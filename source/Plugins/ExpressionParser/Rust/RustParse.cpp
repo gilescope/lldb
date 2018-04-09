@@ -769,8 +769,67 @@ RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("range expressions unimplemented");
-  return ValueObjectSP();
+  ValueObjectSP left, right;
+
+  if (m_left) {
+    left = m_left->Evaluate(exe_ctx, error);
+    if (!left) {
+      return left;
+    }
+  }
+  if (m_right) {
+    right = m_right->Evaluate(exe_ctx, error);
+    if (!right) {
+      return right;
+    }
+  }
+
+  std::string name;
+  CompilerType element_type;
+  if (left) {
+    if (right) {
+      name = m_inclusive ? "core::ops::range::RangeInclusive" : "Range";
+      // FIXME this check seems wrong
+      if (left->GetCompilerType() != right->GetCompilerType()) {
+        // FIXME also we could be friendlier about integer promotion
+        // here.
+        error.SetErrorString("operands of \"..\" do not have same type");
+        return ValueObjectSP();
+      }
+    } else {
+      name = "core::ops::range::RangeFrom";
+    }
+    element_type = left->GetCompilerType();
+  } else if (right) {
+    name = m_inclusive ? "core::ops::range::RangeToInclusive" : "core::ops::range::RangeTo";
+    element_type = right->GetCompilerType();
+  } else {
+    name = "core::ops::range::RangeFull";
+  }
+  assert(!name.empty());
+
+  if (element_type) {
+    name = name + "<" + element_type.GetTypeName().AsCString() + ">";
+  }
+
+  CompilerType range_type = GetTypeByName(exe_ctx, name.c_str(), error);
+  if (!range_type) {
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP result = CreateValueInMemory(exe_ctx, range_type, error);
+  if (!result) {
+    return result;
+  }
+
+  if (left && !SetField(result, "start", left, error)) {
+    return ValueObjectSP();
+  }
+  if (right && !SetField(result, "end", right, error)) {
+    return ValueObjectSP();
+  }
+
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////

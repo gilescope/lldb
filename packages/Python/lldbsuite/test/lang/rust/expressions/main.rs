@@ -77,5 +77,10 @@ fn main() {
 
     let vsimpleenum_ref = &vsimpleenum;
 
+    let vrange = 0..5;
+    let vrange_from = 0..;
+    let vrange_to = ..5;
+    let vrange_full = ..;
+
     do_nothing();               // breakpoint
 }

@@ -630,6 +630,100 @@ private:
   CompilerType m_type;
 };
 
+class RustDecl;
+class RustDeclContext;
+
+class RustDeclBase {
+public:
+
+  ConstString Name() const {
+    return m_name;
+  }
+
+  ConstString QualifiedName() {
+    if (!m_parent) {
+      return m_name;
+    }
+    if (!m_full_name) {
+      ConstString basename = m_parent->QualifiedName();
+      if (basename) {
+        std::string qual = std::string(basename.AsCString()) + "::" + m_name.AsCString();
+        m_full_name = ConstString(qual.c_str());
+      } else {
+        m_full_name = m_name;
+      }
+    }
+    return m_full_name;
+  }
+
+  RustDeclContext *Context() const {
+    // Always succeeds.
+    return m_parent->AsDeclContext();
+  }
+
+  virtual RustDecl *AsDecl() { return nullptr; }
+  virtual RustDeclContext *AsDeclContext() { return nullptr; }
+
+  virtual ~RustDeclBase() { }
+
+protected:
+
+  RustDeclBase(const ConstString &name, RustDeclBase *parent)
+    : m_name(name),
+      m_parent(parent)
+  {
+  }
+
+private:
+
+  ConstString m_name;
+  // This is really a RustDeclContext.
+  RustDeclBase *m_parent;
+  ConstString m_full_name;
+};
+
+class RustDeclContext : public RustDeclBase {
+public:
+  RustDeclContext(const ConstString &name, RustDeclContext *parent)
+    : RustDeclBase(name, parent)
+  {
+  }
+
+  RustDeclContext *AsDeclContext() override { return this; }
+
+  RustDeclBase *FindByName(const ConstString &name) {
+    auto iter = m_decls.find(name);
+    if (iter == m_decls.end()) {
+      return nullptr;
+    }
+    return iter->second.get();
+  }
+
+  void AddItem(std::unique_ptr<RustDeclBase> &&item) {
+    ConstString name = item->Name();
+    m_decls[name] = std::move(item);
+  }
+
+private:
+  std::map<ConstString, std::unique_ptr<RustDeclBase>> m_decls;
+};
+
+class RustDecl : public RustDeclBase {
+public:
+  RustDecl(const ConstString &name, RustDeclContext *parent)
+    : RustDeclBase(name, parent)
+  {
+    assert(parent);
+  }
+
+  RustDecl *AsDecl() override { return this; }
+
+  ConstString MangledName() const {
+    // fixme
+    return ConstString();
+  }
+};
+
 } // namespace lldb_private
 using namespace lldb_private;
 
@@ -1781,4 +1875,102 @@ UserExpression *RustASTContextForExpr::GetUserExpression(
     return new RustUserExpression(*target, expr, prefix, language, desired_type,
                                   options);
   return nullptr;
+}
+
+ConstString RustASTContext::DeclGetName(void *opaque_decl) {
+  RustDecl *dc = (RustDecl *) opaque_decl;
+  return dc->Name();
+}
+
+ConstString RustASTContext::DeclGetMangledName(void *opaque_decl) {
+  RustDecl *dc = (RustDecl *) opaque_decl;
+  return dc->MangledName();
+}
+
+CompilerDeclContext RustASTContext::DeclGetDeclContext(void *opaque_decl) {
+  RustDecl *dc = (RustDecl *) opaque_decl;
+  return CompilerDeclContext(this, dc->Context());
+}
+
+ConstString RustASTContext::DeclContextGetName(void *opaque_decl_ctx) {
+  RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
+  return dc->Name();
+}
+
+ConstString RustASTContext::DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) {
+  RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
+  return dc->QualifiedName();
+}
+
+bool RustASTContext::DeclContextIsStructUnionOrClass(void *opaque_decl_ctx) {
+  // Not totally sure this is right.  FIXME.
+  // What about "impl Struct { ... }" ?
+  return false;
+}
+
+bool RustASTContext::DeclContextIsClassMethod(void *opaque_decl_ctx,
+                                              lldb::LanguageType *language_ptr,
+                                              bool *is_instance_method_ptr,
+                                              ConstString *language_object_name_ptr) {
+  return false;
+}
+
+std::vector<CompilerDecl>
+RustASTContext::DeclContextFindDeclByName(void *opaque_decl_ctx, ConstString name,
+                                          const bool ignore_imported_decls) {
+  RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
+  std::vector<CompilerDecl> result;
+  RustDeclBase *base = dc->FindByName(name);
+  if (RustDecl *decl = base ? base->AsDecl() : nullptr) {
+    result.push_back(CompilerDecl(this, decl));
+  }
+  return result;
+}
+
+CompilerDeclContext RustASTContext::GetTranslationUnitDecl() {
+  if (!m_tu_decl) {
+    m_tu_decl.reset(new RustDeclContext(ConstString(""), nullptr));
+  }
+  return CompilerDeclContext(this, m_tu_decl.get());
+}
+
+CompilerDeclContext
+RustASTContext::GetNamespaceDecl(CompilerDeclContext parent, const ConstString &name) {
+  if (!parent)
+    return CompilerDeclContext();
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
+  if (!ast)
+    return CompilerDeclContext();
+
+  RustDeclContext *dc = (RustDeclContext *) parent.GetOpaqueDeclContext();
+  RustDeclBase *base = dc->FindByName(name);
+  if (base) {
+    if (RustDeclContext *ctx = base->AsDeclContext()) {
+      return CompilerDeclContext(this, ctx);
+    }
+  }
+
+  RustDeclContext *new_ns = new RustDeclContext(name, dc);
+  dc->AddItem(std::unique_ptr<RustDeclBase>(new_ns));
+  return CompilerDeclContext(this, new_ns);
+}
+
+CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent, const ConstString &name) {
+  if (!parent)
+    return CompilerDecl();
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
+  if (!ast)
+    return CompilerDecl();
+
+  RustDeclContext *dc = (RustDeclContext *) parent.GetOpaqueDeclContext();
+  RustDeclBase *base = dc->FindByName(name);
+  if (base) {
+    if (RustDecl *ctx = base->AsDecl()) {
+      return CompilerDecl(this, ctx);
+    }
+  }
+
+  RustDecl *new_ns = new RustDecl(name, dc);
+  dc->AddItem(std::unique_ptr<RustDeclBase>(new_ns));
+  return CompilerDecl(this, new_ns);
 }

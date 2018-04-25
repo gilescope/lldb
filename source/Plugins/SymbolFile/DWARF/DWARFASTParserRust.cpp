@@ -183,6 +183,18 @@ private:
   DWARFDIE m_die;
 };
 
+ConstString DWARFASTParserRust::FullyQualify(const ConstString &name, const DWARFDIE &die) {
+  SymbolFileDWARF *dwarf = die.GetDWARF();
+  lldb::user_id_t id = die.GetID();
+  CompilerDeclContext ctx = dwarf->GetDeclContextContainingUID(id);
+  ConstString ctx_name = ctx.GetScopeQualifiedName();
+  if (!ctx_name) {
+    return name;
+  }
+  std::string qual_name = std::string(ctx_name.AsCString()) + "::" + name.AsCString();
+  return ConstString(qual_name.c_str());
+}
+
 TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDIE &die) {
   lldb::user_id_t encoding_uid = LLDB_INVALID_UID;
   const char *type_name_cstr = NULL;
@@ -245,8 +257,10 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
     // Note that, currently, rustc does not emit DW_TAG_reference_type
     // - references are distinguished by name; and also we don't want
     // to treat Rust references as CompilerType references.
-  case DW_TAG_pointer_type:
   case DW_TAG_typedef:
+    type_name_const_str = FullyQualify(type_name_const_str, die);
+    // Fall through.
+  case DW_TAG_pointer_type:
   case DW_TAG_template_type_parameter: {
     Type *type = dwarf->ResolveTypeUID(encoding_uid);
     if (type) {
@@ -657,6 +671,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   // zero-length tuple struct.  This decision might be changed by
   // ParseFields.
   bool is_tuple = type_name_cstr && type_name_cstr[0] == '(';
+  // We might see a tuple struct, and we want to differentiate the two
+  // when qualifying names.
+  bool is_anon_tuple = is_tuple;
   bool saw_discr = false;
   uint64_t discr_offset, discr_byte_size;
   std::vector<size_t> discriminant_path;
@@ -707,6 +724,10 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 			     dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
   if (!compiler_type) {
     compiler_type_was_created = true;
+
+    if (!is_anon_tuple) {
+      type_name_const_str = FullyQualify(type_name_const_str, die);
+    }
 
     if (saw_discr) {
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
@@ -804,6 +825,8 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE
   // enum.
   if (die.GetDIERef() == m_discriminant) {
     type_name_const_str.Clear();
+  } else {
+    type_name_const_str = FullyQualify(type_name_const_str, die);
   }
 
   std::map<uint64_t, std::string> values;
@@ -1019,4 +1042,79 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(const SymbolContext &sc,
     }
   }
   return NULL;
+}
+
+lldb_private::CompilerDeclContext
+DWARFASTParserRust::GetDeclContextForUIDFromDWARF(const DWARFDIE &die) {
+  auto iter = m_decl_contexts.find(die.GetDIE());
+  if (iter != m_decl_contexts.end()) {
+    return iter->second;
+  }
+
+  CompilerDeclContext result;
+  switch (die.Tag()) {
+  case DW_TAG_compile_unit:
+    result = m_ast.GetTranslationUnitDecl();
+    break;
+
+  case DW_TAG_namespace: {
+    const char *name = die.GetName();
+    if (name) {
+      CompilerDeclContext parent = GetDeclContextContainingUIDFromDWARF(die);
+      result = m_ast.GetNamespaceDecl(parent, ConstString(name));
+    }
+    break;
+  }
+
+    // lexical block?  function?
+  default:
+    break;
+  }
+
+  if (result) {
+    m_decl_contexts[die.GetDIE()] = result;
+    m_decl_contexts_to_die.emplace(result, die);
+  }
+
+  return result;
+}
+
+lldb_private::CompilerDeclContext
+DWARFASTParserRust::GetDeclContextContainingUIDFromDWARF(const DWARFDIE &die) {
+  SymbolFileDWARF *dwarf = die.GetDWARF();
+  DWARFDIE decl_ctx_die = dwarf->GetDeclContextDIEContainingDIE(die);
+  return GetDeclContextForUIDFromDWARF(decl_ctx_die);
+}
+
+lldb_private::CompilerDecl
+DWARFASTParserRust::GetDeclForUIDFromDWARF(const DWARFDIE &die) {
+  auto iter = m_decls.find(die.GetDIE());
+  if (iter != m_decls.end()) {
+    return iter->second;
+  }
+
+  CompilerDecl result;
+  if (die.Tag() == DW_TAG_variable && die.Tag() == DW_TAG_constant) {
+    const char *name = die.GetName();
+    if (name) {
+      CompilerDeclContext parent = GetDeclContextContainingUIDFromDWARF(die);
+      result = m_ast.GetDecl(parent, ConstString(name));
+
+      if (result) {
+        m_decls[die.GetDIE()] = result;
+      }
+    }
+  }
+
+  return result;
+}
+
+std::vector<DWARFDIE>
+DWARFASTParserRust::GetDIEForDeclContext(lldb_private::CompilerDeclContext decl_context) {
+  std::vector<DWARFDIE> result;
+  for (auto it = m_decl_contexts_to_die.find(decl_context);
+       it != m_decl_contexts_to_die.end();
+       ++it)
+    result.push_back(it->second);
+  return result;
 }

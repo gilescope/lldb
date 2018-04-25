@@ -26,8 +26,9 @@
 
 namespace lldb_private {
 
+class RustDecl;
+class RustDeclContext;
 class RustType;
-class Declaration;
 
 class RustASTContext : public TypeSystem {
 public:
@@ -68,31 +69,24 @@ public:
   //----------------------------------------------------------------------
   // CompilerDecl functions
   //----------------------------------------------------------------------
-  ConstString DeclGetName(void *opaque_decl) override { return ConstString(); }
+  ConstString DeclGetName(void *opaque_decl) override;
+  ConstString DeclGetMangledName(void *opaque_decl) override;
+  CompilerDeclContext DeclGetDeclContext(void *opaque_decl) override;
+
 
   //----------------------------------------------------------------------
   // CompilerDeclContext functions
   //----------------------------------------------------------------------
 
-  bool DeclContextIsStructUnionOrClass(void *opaque_decl_ctx) override {
-    return false;
-  }
-
-  ConstString DeclContextGetName(void *opaque_decl_ctx) override {
-    return ConstString();
-  }
-
-  ConstString DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) override {
-    return ConstString();
-  }
-
-  bool
-  DeclContextIsClassMethod(void *opaque_decl_ctx,
-                           lldb::LanguageType *language_ptr,
-                           bool *is_instance_method_ptr,
-                           ConstString *language_object_name_ptr) override {
-    return false;
-  }
+  std::vector<CompilerDecl>
+  DeclContextFindDeclByName(void *opaque_decl_ctx, ConstString name,
+                            const bool ignore_imported_decls) override;
+  bool DeclContextIsStructUnionOrClass(void *opaque_decl_ctx) override;
+  ConstString DeclContextGetName(void *opaque_decl_ctx) override;
+  ConstString DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) override;
+  bool DeclContextIsClassMethod(void *opaque_decl_ctx, lldb::LanguageType *language_ptr,
+                                bool *is_instance_method_ptr,
+                                ConstString *language_object_name_ptr) override;
 
   //----------------------------------------------------------------------
   // Creating Types
@@ -364,10 +358,6 @@ public:
   void DumpTypeDescription(lldb::opaque_compiler_type_t type,
                            Stream *s) override;
 
-  //----------------------------------------------------------------------
-  // TODO: These methods appear unused. Should they be removed?
-  //----------------------------------------------------------------------
-
   bool IsRuntimeGeneratedType(lldb::opaque_compiler_type_t type) override;
 
   void DumpSummary(lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx,
@@ -379,10 +369,6 @@ public:
   size_t ConvertStringToFloatValue(lldb::opaque_compiler_type_t type,
                                    const char *s, uint8_t *dst,
                                    size_t dst_size) override;
-
-  //----------------------------------------------------------------------
-  // TODO: Determine if these methods should move to ClangASTContext.
-  //----------------------------------------------------------------------
 
   bool IsPointerOrReferenceType(lldb::opaque_compiler_type_t type,
                                 CompilerType *pointee_type = nullptr) override;
@@ -422,11 +408,17 @@ public:
                        CompilerType *pointee_type = nullptr,
                        bool *is_rvalue = nullptr) override;
 
+  CompilerDeclContext GetTranslationUnitDecl();
+  CompilerDeclContext GetNamespaceDecl(CompilerDeclContext parent, const ConstString &name);
+  CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name);
+
 private:
   int m_pointer_byte_size;
   std::map<ConstString, std::unique_ptr<RustType>> m_types;
   std::set<std::unique_ptr<RustType>> m_anon_types;
   std::unique_ptr<DWARFASTParser> m_dwarf_ast_parser_ap;
+
+  std::unique_ptr<RustDeclContext> m_tu_decl;
 
   RustType *FindCachedType(const lldb_private::ConstString &name);
   CompilerType CacheType(const lldb_private::ConstString &name, RustType *new_type);

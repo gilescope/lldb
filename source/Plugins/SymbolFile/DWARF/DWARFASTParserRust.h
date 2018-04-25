@@ -16,10 +16,12 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "lldb/Utility/ConstString.h"
 
 // Project includes
 #include "DWARFASTParser.h"
 #include "DWARFDIE.h"
+#include "DWARFDebugInfoEntry.h"
 #include "DWARFDefines.h"
 #include "DIERef.h"
 #include "lldb/Core/PluginInterface.h"
@@ -48,24 +50,15 @@ public:
                              lldb_private::CompilerType &rust_type) override;
 
   lldb_private::CompilerDeclContext
-  GetDeclContextForUIDFromDWARF(const DWARFDIE &die) override {
-    return lldb_private::CompilerDeclContext();
-  }
+  GetDeclContextForUIDFromDWARF(const DWARFDIE &die) override;
 
   lldb_private::CompilerDeclContext
-  GetDeclContextContainingUIDFromDWARF(const DWARFDIE &die) override {
-    return lldb_private::CompilerDeclContext();
-  }
+  GetDeclContextContainingUIDFromDWARF(const DWARFDIE &die) override;
 
-  lldb_private::CompilerDecl
-  GetDeclForUIDFromDWARF(const DWARFDIE &die) override {
-    return lldb_private::CompilerDecl();
-  }
+  lldb_private::CompilerDecl GetDeclForUIDFromDWARF(const DWARFDIE &die) override;
 
-  std::vector<DWARFDIE> GetDIEForDeclContext(
-      lldb_private::CompilerDeclContext decl_context) override {
-    return std::vector<DWARFDIE>();
-  }
+  std::vector<DWARFDIE> GetDIEForDeclContext(lldb_private::CompilerDeclContext decl_context)
+    override;
 
 private:
   lldb::TypeSP ParseSimpleType(lldb_private::Log *log, const DWARFDIE &die);
@@ -73,6 +66,8 @@ private:
   lldb::TypeSP ParseFunctionType(const DWARFDIE &die);
   lldb::TypeSP ParseStructureType(const DWARFDIE &die);
   lldb::TypeSP ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE &die);
+  lldb_private::ConstString FullyQualify(const lldb_private::ConstString &name,
+                                         const DWARFDIE &die);
 
   std::vector<size_t> ParseDiscriminantPath(const char **in_str);
   void FindDiscriminantLocation(lldb_private::CompilerType type,
@@ -118,6 +113,10 @@ private:
   // the enumeration type, we set this member, and ParseCLikeEnum
   // avoids giving the name to the enumeration type.
   DIERef m_discriminant;
+
+  llvm::DenseMap<const DWARFDebugInfoEntry *, lldb_private::CompilerDeclContext> m_decl_contexts;
+  llvm::DenseMap<const DWARFDebugInfoEntry *, lldb_private::CompilerDecl> m_decls;
+  std::multimap<lldb_private::CompilerDeclContext, const DWARFDIE> m_decl_contexts_to_die;
 };
 
 #endif // SymbolFileDWARF_DWARFASTParserRust_h_

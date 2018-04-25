@@ -125,7 +125,7 @@ GetTypeByName(ExecutionContext &exe_ctx, const char *name, Status &error) {
   SymbolContext sc;
   TypeList type_list;
   llvm::DenseSet<SymbolFile *> searched_symbol_files;
-  uint32_t num_matches = target->GetImages().FindTypes(sc, ConstString(name), false,
+  uint32_t num_matches = target->GetImages().FindTypes(sc, ConstString(name), true,
                                                        2, searched_symbol_files, type_list);
   if (num_matches > 0) {
     return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
@@ -788,7 +788,7 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   CompilerType element_type;
   if (left) {
     if (right) {
-      name = m_inclusive ? "core::ops::range::RangeInclusive" : "Range";
+      name = m_inclusive ? "::core::ops::range::RangeInclusive" : "::core::ops::range::Range";
       // FIXME this check seems wrong
       if (left->GetCompilerType() != right->GetCompilerType()) {
         // FIXME also we could be friendlier about integer promotion
@@ -797,14 +797,14 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
         return ValueObjectSP();
       }
     } else {
-      name = "core::ops::range::RangeFrom";
+      name = "::core::ops::range::RangeFrom";
     }
     element_type = left->GetCompilerType();
   } else if (right) {
-    name = m_inclusive ? "core::ops::range::RangeToInclusive" : "core::ops::range::RangeTo";
+    name = m_inclusive ? "::core::ops::range::RangeToInclusive" : "::core::ops::range::RangeTo";
     element_type = right->GetCompilerType();
   } else {
-    name = "core::ops::range::RangeFull";
+    name = "::core::ops::range::RangeFull";
   }
   assert(!name.empty());
 

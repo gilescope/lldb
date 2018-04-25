@@ -113,10 +113,10 @@ class TestRustASTContext(TestBase):
         mytypelist.append(('*mut char', 'vcharpointer', address_size, None))
         mytypelist.append(('&i8', 'vi8ref', address_size, None))
         mytypelist.append(('&mut u8', 'vu8ref', address_size, None))
-        mytypelist.append(('CLikeEnum', 'vclikeenum', 1, 'CLikeEnum::MinusOne'))
+        mytypelist.append(('main::CLikeEnum', 'vclikeenum', 1, 'main::CLikeEnum::MinusOne'))
         # FIXME no expected values until we fix printing.
-        mytypelist.append(('SimpleEnum', 'vsimpleenum', 6, None)) # 'SimpleEnum::Two(83, 92)'))
-        mytypelist.append(('OptimizedEnum', 'voptenum', address_size, None)) # 'OptimizedEnum::Null'))
+        mytypelist.append(('main::SimpleEnum', 'vsimpleenum', 6, None)) # 'SimpleEnum::Two(83, 92)'))
+        mytypelist.append(('main::OptimizedEnum', 'voptenum', address_size, None)) # 'OptimizedEnum::Null'))
 
         for (name, vname, size, value) in mytypelist:
             v = self.var(vname)
@@ -135,14 +135,14 @@ class TestRustASTContext(TestBase):
 
     def check_structs(self):
         for (vname, typename, m0name, m1name, desc) in [
-                ('vstruct', 'Struct', 'field1', 'field2',
-                 'struct Struct {\n  field1: u8,\n  field2: char\n}'),
-                ('vtuplestruct', 'TupleStruct', None, None,
-                 'struct TupleStruct (\n  u8,\n  char\n)'),
+                ('vstruct', 'main::Struct', 'field1', 'field2',
+                 'struct main::Struct {\n  field1: u8,\n  field2: char\n}'),
+                ('vtuplestruct', 'main::TupleStruct', None, None,
+                 'struct main::TupleStruct (\n  u8,\n  char\n)'),
                 ('vtuple', '(u8, char)', None, None,
                  '(\n  u8,\n  char\n)'),
-                ('vunion', 'Union', 'field1', 'field2',
-                 'union Union {\n  field1: u8,\n  field2: char\n}'),
+                ('vunion', 'main::Union', 'field1', 'field2',
+                 'union main::Union {\n  field1: u8,\n  field2: char\n}'),
         ]:
             v = self.var(vname)
             vtype = v.GetType()

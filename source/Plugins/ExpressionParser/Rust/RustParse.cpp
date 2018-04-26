@@ -10,6 +10,7 @@
 #include "RustParse.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ValueObject.h"
+#include "lldb/Symbol/Block.h"
 #include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/TypeList.h"
@@ -354,6 +355,88 @@ lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
   return result;
 }
 
+CompilerDeclContext
+RustPath::FrameDeclContext(ExecutionContext &exe_ctx, Status &error) {
+  StackFrame *frame = exe_ctx.GetFramePtr();
+  if (frame == nullptr) {
+    // FIXME?
+    error.SetErrorString("no frame when looking up item");
+    return CompilerDeclContext();
+  }
+
+  SymbolContext sym_ctx = frame->GetSymbolContext(lldb::eSymbolContextFunction |
+                                                  lldb::eSymbolContextBlock);
+
+  if (sym_ctx.block) {
+    CompilerDeclContext frame_decl_context = sym_ctx.block->GetDeclContext();
+    if (frame_decl_context) {
+      return frame_decl_context;
+    }
+  }
+
+  error.SetErrorString("could not find frame's decl context");
+  return CompilerDeclContext();
+}
+
+std::string
+RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
+  std::string name;
+
+  if (m_supers > 0) {
+    RustASTContext *ast = GetASTContext(exe_ctx, error);
+    if (!ast) {
+      return std::string();
+    }
+
+    CompilerDeclContext decl_ctx = FrameDeclContext(exe_ctx, error);
+    if (!decl_ctx) {
+      return std::string();
+    }
+
+    for (int i = 0; i < m_supers; ++i) {
+      if (decl_ctx.GetName().IsEmpty()) {
+        error.SetErrorString("too many 'super's");
+        return std::string();
+      }
+      decl_ctx = ast->GetDeclContextDeclContext(decl_ctx);
+    }
+
+    name = std::string("::") + decl_ctx.GetScopeQualifiedName().AsCString();
+  } else if (!m_relative) {
+    name = "::";
+  }
+
+  {
+    bool first = true;
+    for (const std::string &str : m_path) {
+      if (!first) {
+        name += "::";
+      }
+      first = false;
+      name += str;
+    }
+  }
+
+  if (!m_generic_params.empty()) {
+    name += "<";
+    bool first = true;
+    for (const RustTypeExpressionUP &param : m_generic_params) {
+      CompilerType type = param->Evaluate(exe_ctx, error);
+      if (!type) {
+        return std::string();
+      }
+      if (!first) {
+        name += ", ";
+      }
+      first = false;
+      name += type.GetTypeName().AsCString();
+    }
+    name += ">";
+  }
+
+  return name;
+}
+
 lldb::ValueObjectSP
 RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   CompilerType type = m_type->Evaluate(exe_ctx, error);
@@ -454,23 +537,9 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     return ValueObjectSP();
   }
 
-  // FIXME must support super, generic params, and also handle
-  // relative case more correctly
-  if (m_supers) {
-    error.SetErrorString("can't use super:: in item name yet");
+  std::string fullname = m_path->Name(exe_ctx, error);
+  if (error.Fail()) {
     return ValueObjectSP();
-  }
-  if (!m_generic_params.empty()) {
-    error.SetErrorString("can't use generic parameters in item name yet");
-    return ValueObjectSP();
-  }
-  std::string fullname;
-  for (const std::string &name : m_path) {
-    if (fullname.empty()) {
-      fullname = name;
-    } else {
-      fullname = fullname + "::" + name;
-    }
   }
 
   ConstString cs_name(fullname.c_str());
@@ -837,25 +906,10 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 CompilerType
 RustPathTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  // FIXME must support super, generic params, and also handle
-  // relative case more correctly
-  if (m_supers) {
-    error.SetErrorString("can't use super:: in type name yet");
+  std::string fullname = m_path->Name(exe_ctx, error);
+  if (error.Fail()) {
     return CompilerType();
   }
-  if (!m_generic_params.empty()) {
-    error.SetErrorString("can't use generic parameters in type name yet");
-    return CompilerType();
-  }
-  std::string fullname;
-  for (const std::string &name : m_path) {
-    if (fullname.empty()) {
-      fullname = name;
-    } else {
-      fullname = fullname + "::" + name;
-    }
-  }
-
   return GetTypeByName(exe_ctx, fullname.c_str(), error);
 }
 
@@ -1140,10 +1194,8 @@ RustExpressionUP Parser::Struct(RustTypeExpressionUP &&path, Status &error) {
       RustExpressionUP value;
       if (CurrentToken().kind == ',' || CurrentToken().kind == '}') {
         // Plain "field".
-        std::vector<std::string> path;
-        path.push_back(field);
-        value = llvm::make_unique<RustPathExpression>(true, 0, std::move(path),
-                                                      std::vector<RustTypeExpressionUP>());
+        std::string field_copy = field;
+        value = llvm::make_unique<RustPathExpression>(std::move(field_copy));
       } else if (CurrentToken().kind != ':') {
         error.SetErrorString("':' expected");
         return RustExpressionUP();
@@ -1197,12 +1249,9 @@ RustExpressionUP Parser::Path(Status &error) {
   if (saw_self) {
     Advance();
     if (CurrentToken().kind != COLONCOLON) {
-      std::vector<std::string> path;
-      path.emplace_back("self");
       // This one can't be a struct expression, so we just return
       // directly.
-      return llvm::make_unique<RustPathExpression>(true, 0, std::move(path),
-                                                   std::vector<RustTypeExpressionUP> ());
+      return llvm::make_unique<RustPathExpression>(std::string("self"));
     }
   }
 
@@ -1252,14 +1301,16 @@ RustExpressionUP Parser::Path(Status &error) {
   }
 
   if (CurrentToken().kind == '{') {
+    RustPathUP name_path = llvm::make_unique<RustPath>(relative, supers, std::move(path),
+                                                       std::move(type_list), true);
     RustTypeExpressionUP type_path =
-      llvm::make_unique<RustPathTypeExpression>(relative, supers, std::move(path),
-                                                std::move(type_list), true);
+      llvm::make_unique<RustPathTypeExpression>(std::move(name_path));
     return Struct(std::move(type_path), error);
   }
 
-  return llvm::make_unique<RustPathExpression>(relative, supers, std::move(path),
-                                               std::move(type_list));
+    RustPathUP name_path = llvm::make_unique<RustPath>(relative, supers, std::move(path),
+                                                       std::move(type_list));
+    return llvm::make_unique<RustPathExpression>(std::move(name_path));
 }
 
 RustExpressionUP Parser::Sizeof(Status &error) {
@@ -1878,8 +1929,9 @@ RustTypeExpressionUP Parser::TypePath(Status &error) {
     return RustTypeExpressionUP();
   }
 
-  return llvm::make_unique<RustPathTypeExpression>(relative, supers, std::move(path),
-                                                   std::move(type_list));
+  RustPathUP name_path = llvm::make_unique<RustPath>(relative, supers, std::move(path),
+                                                     std::move(type_list));
+  return llvm::make_unique<RustPathTypeExpression>(std::move(name_path));
 }
 
 RustTypeExpressionUP Parser::Type(Status &error) {

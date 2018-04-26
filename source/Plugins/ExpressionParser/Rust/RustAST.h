@@ -57,6 +57,9 @@ typedef std::unique_ptr<RustExpression> RustExpressionUP;
 class RustTypeExpression;
 typedef std::unique_ptr<RustTypeExpression> RustTypeExpressionUP;
 
+class RustPath;
+typedef std::unique_ptr<RustPath> RustPathUP;
+
 Stream &operator<< (Stream &stream, const RustExpressionUP &expr);
 Stream &operator<< (Stream &stream, const RustTypeExpressionUP &type);
 Stream &operator<< (Stream &stream, const Scalar &value);
@@ -74,6 +77,57 @@ Stream &operator<< (Stream &stream, const std::vector<T> &items) {
   }
   return stream;
 }
+
+class RustPath {
+public:
+
+  RustPath(bool relative, int supers, std::vector<std::string> &&path,
+           std::vector<RustTypeExpressionUP> &&generic_params,
+           bool turbofish = false)
+    : m_relative(relative),
+      m_supers(supers),
+      m_path(std::move(path)),
+      m_generic_params(std::move(generic_params)),
+      m_turbofish(turbofish)
+  {
+  }
+
+  void print(Stream &stream) {
+    if (!m_relative) {
+      stream << "::";
+    }
+    for (int i = 0; i < m_supers; ++i) {
+      stream << "super::";
+    }
+    bool first = true;
+    for (const std::string &str : m_path) {
+      if (!first) {
+        stream << "::";
+      }
+      first = false;
+      stream << str;
+    }
+
+    if (!m_generic_params.empty()) {
+      if (m_turbofish) {
+        stream << "::";
+      }
+      stream << "<" << m_generic_params << ">";
+    }
+  }
+
+  std::string Name(ExecutionContext &exe_ctx, Status &error);
+
+private:
+
+  CompilerDeclContext FrameDeclContext(ExecutionContext &exe_ctx, Status &error);
+
+  bool m_relative;
+  int m_supers;
+  std::vector<std::string> m_path;
+  std::vector<RustTypeExpressionUP> m_generic_params;
+  bool m_turbofish;
+};
 
 class RustExpression {
 protected:
@@ -528,43 +582,29 @@ private:
 class RustPathExpression : public RustExpression {
 public:
 
-  RustPathExpression(bool relative, int supers, std::vector<std::string> &&path,
-                     std::vector<RustTypeExpressionUP> &&generic_params)
-    : m_relative(relative),
-      m_supers(supers),
-      m_path(std::move(path)),
-      m_generic_params(std::move(generic_params))
+  RustPathExpression(RustPathUP &&path)
+    : m_path(std::move(path))
   {
   }
 
+  explicit RustPathExpression(std::string &&item)
+  {
+    std::vector<std::string> names;
+    names.push_back(std::move(item));
+
+    m_path = llvm::make_unique<RustPath>(true, 0, std::move(names),
+                                         std::vector<RustTypeExpressionUP>());
+  }
+
   void print(Stream &stream) override {
-    if (!m_relative) {
-      stream << "::";
-    }
-    for (int i = 0; i < m_supers; ++i) {
-      stream << "super::";
-    }
-    bool first = true;
-    for (const std::string &str : m_path) {
-      if (!first) {
-        stream << "::";
-      }
-      first = false;
-      stream << str;
-    }
-    if (!m_generic_params.empty()) {
-      stream << "::<" << m_generic_params << ">";
-    }
+    m_path->print(stream);
   }
 
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 
-  bool m_relative;
-  int m_supers;
-  std::vector<std::string> m_path;
-  std::vector<RustTypeExpressionUP> m_generic_params;
+  RustPathUP m_path;
 };
 
 class RustStructExpression : public RustExpression {
@@ -615,57 +655,29 @@ public:
 class RustPathTypeExpression : public RustTypeExpression {
 public:
 
-  RustPathTypeExpression(bool relative, int supers, std::vector<std::string> &&path,
-                         std::vector<RustTypeExpressionUP> &&generic_params,
-                         bool for_expr = false)
-    : m_relative(relative),
-      m_supers(supers),
-      m_path(std::move(path)),
-      m_generic_params(std::move(generic_params)),
-      m_for_expr(for_expr)
+  RustPathTypeExpression(RustPathUP &&path)
+    : m_path(std::move(path))
   {
   }
 
   explicit RustPathTypeExpression(std::string &&item)
-    : m_relative(true),
-      m_supers(0)
   {
-    m_path.push_back(std::move(item));
+    std::vector<std::string> names;
+    names.push_back(std::move(item));
+
+    m_path = llvm::make_unique<RustPath>(true, 0, std::move(names),
+                                         std::vector<RustTypeExpressionUP>());
   }
 
   void print(Stream &stream) override {
-    if (!m_relative) {
-      stream << "::";
-    }
-    for (int i = 0; i < m_supers; ++i) {
-      stream << "super::";
-    }
-    bool first = true;
-    for (const std::string &str : m_path) {
-      if (!first) {
-        stream << "::";
-      }
-      first = false;
-      stream << str;
-    }
-
-    if (!m_generic_params.empty()) {
-      if (m_for_expr) {
-        stream << "::";
-      }
-      stream << "<" << m_generic_params << ">";
-    }
+    m_path->print(stream);
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 
-  bool m_relative;
-  int m_supers;
-  std::vector<std::string> m_path;
-  std::vector<RustTypeExpressionUP> m_generic_params;
-  bool m_for_expr;
+  RustPathUP m_path;
 };
 
 class RustArrayTypeExpression : public RustTypeExpression {

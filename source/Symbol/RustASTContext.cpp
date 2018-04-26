@@ -1955,6 +1955,18 @@ RustASTContext::GetNamespaceDecl(CompilerDeclContext parent, const ConstString &
   return CompilerDeclContext(this, new_ns);
 }
 
+CompilerDeclContext
+RustASTContext::GetDeclContextDeclContext(CompilerDeclContext parent) {
+  if (!parent)
+    return CompilerDeclContext();
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
+  if (!ast)
+    return CompilerDeclContext();
+
+  RustDeclContext *dc = (RustDeclContext *) parent.GetOpaqueDeclContext();
+  return CompilerDeclContext(this, dc->Context());
+}
+
 CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent, const ConstString &name) {
   if (!parent)
     return CompilerDecl();

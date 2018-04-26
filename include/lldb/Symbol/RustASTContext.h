@@ -410,6 +410,7 @@ public:
 
   CompilerDeclContext GetTranslationUnitDecl();
   CompilerDeclContext GetNamespaceDecl(CompilerDeclContext parent, const ConstString &name);
+  CompilerDeclContext GetDeclContextDeclContext(CompilerDeclContext parent);
   CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name);
 
 private:

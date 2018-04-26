@@ -100,9 +100,9 @@ class TestRustASTContext(TestBase):
 
     def check_main_vars(self):
         mytypelist = self._typelist[:]
-        # FIXME value should not be None here
         # Not in _typelist because it isn't eTypeClassBuiltin.
-        mytypelist.append(('()', 'empty', 0, None))
+        # Unclear if we can change the output - FIXME.
+        mytypelist.append(('()', 'empty', 0, '{}'))
         # FIXME Not in _typelist because we can't currently look up
         # this type by name; but also not eTypeClassBuiltin.
         # FIXME there doesn't seem to be a way to customize the array
@@ -126,6 +126,9 @@ class TestRustASTContext(TestBase):
             if value is not None:
                 expected = "(" + name + ") " + vname + " = " + value
                 self.assertEqual(expected, str(v))
+            # Handy for debugging.
+            # else:
+            #     print("GOT === " + str(v))
 
     def check_main_function(self):
         fn_type = self.frame().GetFunction().GetType()

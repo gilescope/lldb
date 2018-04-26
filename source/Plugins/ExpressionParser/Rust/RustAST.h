@@ -657,7 +657,7 @@ public:
     }
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error);
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
 
 private:
 

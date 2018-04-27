@@ -100,8 +100,8 @@ class TestRustASTContext(TestBase):
 
     def check_main_vars(self):
         mytypelist = self._typelist[:]
-        # Not in _typelist because it isn't eTypeClassBuiltin.
-        # Unclear if we can change the output - FIXME.
+        # Not in _typelist because it isn't eTypeClassBuiltin; and
+        # note that the output of "{}" can't be changed.
         mytypelist.append(('()', 'empty', 0, '{}'))
         # FIXME Not in _typelist because we can't currently look up
         # this type by name; but also not eTypeClassBuiltin.

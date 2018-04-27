@@ -103,9 +103,7 @@ class TestRustASTContext(TestBase):
         # Not in _typelist because it isn't eTypeClassBuiltin; and
         # note that the output of "{}" can't be changed.
         mytypelist.append(('()', 'empty', 0, '{}'))
-        # FIXME Not in _typelist because we can't currently look up
-        # this type by name; but also not eTypeClassBuiltin.
-        # FIXME there doesn't seem to be a way to customize the array
+        # Note there doesn't seem to be a way to customize the array
         # formatting to be more rust-like.
         mytypelist.append(('[i8; 4]', 'vi8array', 4, '([0] = 1, [1] = 2, [2] = 3, [3] = 4)'))
         address_size = self.target().GetAddressByteSize()

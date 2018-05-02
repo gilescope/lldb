@@ -1903,8 +1903,9 @@ ConstString RustASTContext::DeclContextGetScopeQualifiedName(void *opaque_decl_c
 }
 
 bool RustASTContext::DeclContextIsStructUnionOrClass(void *opaque_decl_ctx) {
-  // Not totally sure this is right.  FIXME.
-  // What about "impl Struct { ... }" ?
+  // This is not actually correct -- for example an enum arm is nested
+  // in its containing enum -- but as far as I can tell this result
+  // doesn't matter for Rust.
   return false;
 }
 

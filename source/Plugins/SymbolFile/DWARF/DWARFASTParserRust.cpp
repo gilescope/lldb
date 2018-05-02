@@ -461,11 +461,36 @@ void DWARFASTParserRust::FindDiscriminantLocation(CompilerType type,
   }
 }
 
+bool DWARFASTParserRust::IsPossibleEnumVariant(const DWARFDIE &die) {
+  if (die.Tag() != DW_TAG_structure_type) {
+    // Only structures can be enum variants.
+    return false;
+  }
+
+  for (auto &&child_die : IterableDIEChildren(die)) {
+    if (child_die.Tag() == DW_TAG_member) {
+      for (auto &&attr : IterableDIEAttrs(child_die)) {
+	if (attr.first == DW_AT_name) {
+	  return strcmp(attr.second.AsCString(), "RUST$ENUM$DISR") == 0;
+        }
+      }
+      // No name, so whatever it is, it isn't an enum variant.
+      return false;
+    }
+  }
+
+  // We didn't see a member, and an empty structure might well be an
+  // enum variant.
+  return true;
+}
+
 std::vector<DWARFASTParserRust::Field>
 DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discriminant_path,
 				bool &is_tuple,
 				uint64_t &discr_offset, uint64_t &discr_byte_size,
 				bool &saw_discr) {
+  SymbolFileDWARF *dwarf = die.GetDWARF();
+
   // We construct a list of fields and then apply them later so that
   // we can analyze the fields to see what sort of structure this
   // really is.
@@ -485,6 +510,8 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
   // NonZero optimization applied, variants are listed in order of
   // discriminant.  We track that value here.
   uint64_t naive_discriminant = 0;
+
+  bool could_be_enum = die.Tag() == DW_TAG_union_type;
 
   ModuleSP module_sp = die.GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
@@ -555,6 +582,9 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 	  break;
 	case DW_AT_type:
 	  new_field.type = attr.second;
+          if (could_be_enum) {
+            could_be_enum = IsPossibleEnumVariant(dwarf->GetDIE(DIERef(new_field.type)));
+          }
 	  break;
 	case DW_AT_data_member_location:
 	  if (attr.second.BlockData()) {
@@ -622,6 +652,17 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
     // but if there were no fields, then we can't tell and so we
     // arbitrarily choose an empty struct.
     is_tuple = field_index > 0;
+  }
+
+  // If we saw a Rust enum, correctly arrange the scope of the various
+  // sub-types.  This is needed to work around the way that the Rust
+  // compiler emits the types: it emits each enum variant's type as a
+  // sibling of the enum type, whereas logically it ought to be a
+  // child.
+  if (could_be_enum) {
+    for (auto &&field : fields) {
+      m_reparent_map[dwarf->GetDIE(DIERef(field.type)).GetDIE()] = die;
+    }
   }
 
   return fields;
@@ -1057,6 +1098,8 @@ DWARFASTParserRust::GetDeclContextForUIDFromDWARF(const DWARFDIE &die) {
     result = m_ast.GetTranslationUnitDecl();
     break;
 
+  case DW_TAG_union_type:
+  case DW_TAG_structure_type:
   case DW_TAG_namespace: {
     const char *name = die.GetName();
     if (name) {
@@ -1081,8 +1124,16 @@ DWARFASTParserRust::GetDeclContextForUIDFromDWARF(const DWARFDIE &die) {
 
 lldb_private::CompilerDeclContext
 DWARFASTParserRust::GetDeclContextContainingUIDFromDWARF(const DWARFDIE &die) {
-  SymbolFileDWARF *dwarf = die.GetDWARF();
-  DWARFDIE decl_ctx_die = dwarf->GetDeclContextDIEContainingDIE(die);
+  DWARFDIE decl_ctx_die;
+
+  DWARFDebugInfoEntry *ptr = die.GetDIE();
+  auto iter = m_reparent_map.find(ptr);
+  if (iter != m_reparent_map.end()) {
+    decl_ctx_die = iter->second;
+  } else {
+    SymbolFileDWARF *dwarf = die.GetDWARF();
+    decl_ctx_die = dwarf->GetDeclContextDIEContainingDIE(die);
+  }
   return GetDeclContextForUIDFromDWARF(decl_ctx_die);
 }
 

@@ -73,8 +73,7 @@ private:
   void FindDiscriminantLocation(lldb_private::CompilerType type,
 				std::vector<size_t> &&path,
 				uint64_t &offset, uint64_t &byte_size);
-
-  lldb_private::RustASTContext &m_ast;
+  bool IsPossibleEnumVariant(const DWARFDIE &die);
 
   struct Field {
     Field()
@@ -107,12 +106,25 @@ private:
 				 uint64_t &discr_offset, uint64_t &discr_byte_size,
 				 bool &saw_discr);
 
+  lldb_private::RustASTContext &m_ast;
+
   // The Rust compiler will emit a DW_TAG_enumeration_type for the
   // type of an enum discriminant.  However, this type will have the
   // same name as the enum type itself.  So, when we expect to read
   // the enumeration type, we set this member, and ParseCLikeEnum
   // avoids giving the name to the enumeration type.
   DIERef m_discriminant;
+
+  // When reading a Rust enum, we set this temporarily when reading
+  // the field types, so that they can get the correct scoping.
+  DWARFDIE m_rust_enum_die;
+
+  // The Rust compiler emits the variants of an enum type as siblings
+  // to the DW_TAG_union_type that (currently) represents the enum.
+  // However, conceptually these ought to be nested.  This map tracks
+  // DIEs involved in this situation so that the enum variants can be
+  // given correctly-scoped names.
+  llvm::DenseMap<const DWARFDebugInfoEntry *, DWARFDIE> m_reparent_map;
 
   llvm::DenseMap<const DWARFDebugInfoEntry *, lldb_private::CompilerDeclContext> m_decl_contexts;
   llvm::DenseMap<const DWARFDebugInfoEntry *, lldb_private::CompilerDecl> m_decls;

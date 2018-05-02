@@ -379,31 +379,47 @@ RustPath::FrameDeclContext(ExecutionContext &exe_ctx, Status &error) {
 }
 
 std::string
-RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
+RustPath::Name(ExecutionContext &exe_ctx, Status &error, bool for_expr, bool *simple_name) {
   std::string name;
 
-  if (m_supers > 0) {
-    RustASTContext *ast = GetASTContext(exe_ctx, error);
-    if (!ast) {
-      return std::string();
-    }
+  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  if (!ast) {
+    return std::string();
+  }
 
+  // Simplify this function.
+  bool dummy;
+  if (simple_name == nullptr) {
+    simple_name = &dummy;
+  }
+
+  *simple_name = true;
+
+  if (!m_relative || m_self || m_supers > 0) {
     CompilerDeclContext decl_ctx = FrameDeclContext(exe_ctx, error);
     if (!decl_ctx) {
       return std::string();
     }
 
-    for (int i = 0; i < m_supers; ++i) {
-      if (decl_ctx.GetName().IsEmpty()) {
+    for (int i = 0; !m_relative || i < m_supers; ++i) {
+      CompilerDeclContext next = ast->GetDeclContextDeclContext(decl_ctx);
+      if (next.GetName().IsEmpty()) {
+        if (!m_relative) {
+          break;
+        }
         error.SetErrorString("too many 'super's");
         return std::string();
       }
-      decl_ctx = ast->GetDeclContextDeclContext(decl_ctx);
+      decl_ctx = next;
     }
 
-    name = std::string("::") + decl_ctx.GetScopeQualifiedName().AsCString();
-  } else if (!m_relative) {
-    name = "::";
+    if (!for_expr) {
+      name += "::";
+    }
+    name += decl_ctx.GetScopeQualifiedName().AsCString();
+    name += "::";
+
+    *simple_name = false;
   }
 
   {
@@ -411,6 +427,7 @@ RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
     for (const std::string &str : m_path) {
       if (!first) {
         name += "::";
+        *simple_name = false;
       }
       first = false;
       name += str;
@@ -537,25 +554,28 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     return ValueObjectSP();
   }
 
-  std::string fullname = m_path->Name(exe_ctx, error);
+  bool simple_name;
+  std::string fullname = m_path->Name(exe_ctx, error, true, &simple_name);
   if (error.Fail()) {
     return ValueObjectSP();
   }
 
   ConstString cs_name(fullname.c_str());
-  VariableListSP frame_vars = frame->GetInScopeVariableList(false);
-  if (frame_vars) {
-    if (VariableSP var = frame_vars->FindVariable(cs_name)) {
-      // FIXME dynamic?  should come from the options, which we aren't
-      // passing in.
-      return frame->GetValueObjectForFrameVariable(var, eDynamicDontRunTarget);
+
+  if (simple_name) {
+    VariableListSP frame_vars = frame->GetInScopeVariableList(false);
+    if (frame_vars) {
+      if (VariableSP var = frame_vars->FindVariable(cs_name)) {
+        // FIXME dynamic?  should come from the options, which we aren't
+        // passing in.
+        return frame->GetValueObjectForFrameVariable(var, eDynamicDontRunTarget);
+      }
     }
   }
 
   VariableList variable_list;
   uint32_t num_matches =
-    target->GetImages().FindGlobalVariables(ConstString(fullname.c_str()),
-                                            false, 1, variable_list);
+    target->GetImages().FindGlobalVariables(cs_name, false, 1, variable_list);
   if (num_matches > 0) {
     // FIXME dynamic?
     return frame->TrackGlobalVariable(variable_list.GetVariableAtIndex(0), eDynamicDontRunTarget);
@@ -1301,16 +1321,17 @@ RustExpressionUP Parser::Path(Status &error) {
   }
 
   if (CurrentToken().kind == '{') {
-    RustPathUP name_path = llvm::make_unique<RustPath>(relative, supers, std::move(path),
-                                                       std::move(type_list), true);
+    RustPathUP name_path = llvm::make_unique<RustPath>(saw_self, relative, supers,
+                                                       std::move(path), std::move(type_list),
+                                                       true);
     RustTypeExpressionUP type_path =
       llvm::make_unique<RustPathTypeExpression>(std::move(name_path));
     return Struct(std::move(type_path), error);
   }
 
-    RustPathUP name_path = llvm::make_unique<RustPath>(relative, supers, std::move(path),
-                                                       std::move(type_list));
-    return llvm::make_unique<RustPathExpression>(std::move(name_path));
+  RustPathUP name_path = llvm::make_unique<RustPath>(saw_self, relative, supers,
+                                                     std::move(path), std::move(type_list));
+  return llvm::make_unique<RustPathExpression>(std::move(name_path));
 }
 
 RustExpressionUP Parser::Sizeof(Status &error) {
@@ -1929,7 +1950,7 @@ RustTypeExpressionUP Parser::TypePath(Status &error) {
     return RustTypeExpressionUP();
   }
 
-  RustPathUP name_path = llvm::make_unique<RustPath>(relative, supers, std::move(path),
+  RustPathUP name_path = llvm::make_unique<RustPath>(saw_self, relative, supers, std::move(path),
                                                      std::move(type_list));
   return llvm::make_unique<RustPathTypeExpression>(std::move(name_path));
 }

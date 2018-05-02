@@ -81,10 +81,11 @@ Stream &operator<< (Stream &stream, const std::vector<T> &items) {
 class RustPath {
 public:
 
-  RustPath(bool relative, int supers, std::vector<std::string> &&path,
+  RustPath(bool self, bool relative, int supers, std::vector<std::string> &&path,
            std::vector<RustTypeExpressionUP> &&generic_params,
            bool turbofish = false)
-    : m_relative(relative),
+    : m_self(self),
+      m_relative(relative),
       m_supers(supers),
       m_path(std::move(path)),
       m_generic_params(std::move(generic_params)),
@@ -93,7 +94,9 @@ public:
   }
 
   void print(Stream &stream) {
-    if (!m_relative) {
+    if (m_self) {
+      stream << "self::";
+    } else if (!m_relative) {
       stream << "::";
     }
     for (int i = 0; i < m_supers; ++i) {
@@ -116,12 +119,14 @@ public:
     }
   }
 
-  std::string Name(ExecutionContext &exe_ctx, Status &error);
+  std::string Name(ExecutionContext &exe_ctx, Status &error,
+                   bool for_expr = false, bool *simple_name = nullptr);
 
 private:
 
   CompilerDeclContext FrameDeclContext(ExecutionContext &exe_ctx, Status &error);
 
+  bool m_self;
   bool m_relative;
   int m_supers;
   std::vector<std::string> m_path;
@@ -592,7 +597,7 @@ public:
     std::vector<std::string> names;
     names.push_back(std::move(item));
 
-    m_path = llvm::make_unique<RustPath>(true, 0, std::move(names),
+    m_path = llvm::make_unique<RustPath>(false, true, 0, std::move(names),
                                          std::vector<RustTypeExpressionUP>());
   }
 
@@ -665,7 +670,7 @@ public:
     std::vector<std::string> names;
     names.push_back(std::move(item));
 
-    m_path = llvm::make_unique<RustPath>(true, 0, std::move(names),
+    m_path = llvm::make_unique<RustPath>(false, true, 0, std::move(names),
                                          std::vector<RustTypeExpressionUP>());
   }
 

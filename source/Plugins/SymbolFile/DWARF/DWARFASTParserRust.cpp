@@ -1109,7 +1109,11 @@ DWARFASTParserRust::GetDeclContextForUIDFromDWARF(const DWARFDIE &die) {
     break;
   }
 
-    // lexical block?  function?
+  case DW_TAG_lexical_block:
+  case DW_TAG_subprogram:
+    result = GetDeclContextContainingUIDFromDWARF(die);
+    break;
+
   default:
     break;
   }

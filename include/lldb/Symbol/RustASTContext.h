@@ -411,7 +411,8 @@ public:
   CompilerDeclContext GetTranslationUnitDecl();
   CompilerDeclContext GetNamespaceDecl(CompilerDeclContext parent, const ConstString &name);
   CompilerDeclContext GetDeclContextDeclContext(CompilerDeclContext parent);
-  CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name);
+  CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name,
+                       const ConstString &mangled);
 
 private:
   int m_pointer_byte_size;

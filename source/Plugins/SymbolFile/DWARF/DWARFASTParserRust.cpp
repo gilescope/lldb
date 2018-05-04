@@ -1152,8 +1152,9 @@ DWARFASTParserRust::GetDeclForUIDFromDWARF(const DWARFDIE &die) {
   if (die.Tag() == DW_TAG_variable || die.Tag() == DW_TAG_constant) {
     const char *name = die.GetName();
     if (name) {
+      const char *mangled = die.GetMangledName();
       CompilerDeclContext parent = GetDeclContextContainingUIDFromDWARF(die);
-      result = m_ast.GetDecl(parent, ConstString(name));
+      result = m_ast.GetDecl(parent, ConstString(name), ConstString(mangled));
 
       if (result) {
         m_decls[die.GetDIE()] = result;

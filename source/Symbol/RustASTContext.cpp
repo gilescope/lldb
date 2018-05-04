@@ -710,8 +710,9 @@ private:
 
 class RustDecl : public RustDeclBase {
 public:
-  RustDecl(const ConstString &name, RustDeclContext *parent)
-    : RustDeclBase(name, parent)
+  RustDecl(const ConstString &name, const ConstString &mangled, RustDeclContext *parent)
+    : RustDeclBase(name, parent),
+      m_mangled(mangled)
   {
     assert(parent);
   }
@@ -719,9 +720,12 @@ public:
   RustDecl *AsDecl() override { return this; }
 
   ConstString MangledName() const {
-    // fixme
-    return ConstString();
+    return m_mangled;
   }
+
+private:
+
+  ConstString m_mangled;
 };
 
 } // namespace lldb_private
@@ -1968,7 +1972,8 @@ RustASTContext::GetDeclContextDeclContext(CompilerDeclContext parent) {
   return CompilerDeclContext(this, dc->Context());
 }
 
-CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent, const ConstString &name) {
+CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent, const ConstString &name,
+                                     const ConstString &mangled) {
   if (!parent)
     return CompilerDecl();
   RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
@@ -1983,7 +1988,7 @@ CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent, const ConstStri
     }
   }
 
-  RustDecl *new_ns = new RustDecl(name, dc);
+  RustDecl *new_ns = new RustDecl(name, mangled, dc);
   dc->AddItem(std::unique_ptr<RustDeclBase>(new_ns));
   return CompilerDecl(this, new_ns);
 }

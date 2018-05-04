@@ -59,24 +59,23 @@ class TestRustNames(TestBase):
     def check_names(self):
         frame = self.frame()
         namelist = [
-            ('::VALUE', 0, 'v0'),
+            ('::VALUE', 7777, 'v0'),
             ('::m1::VALUE', 1, 'v1'),
             ('::m1::m1_1::VALUE', 11, 'v1_1'),
             ('::m1::m1_2::VALUE', 12, 'v1_2'),
             ('::m2::VALUE', 2, 'v2'),
             ('::m2::m2_1::VALUE', 21, 'v2_1'),
-            # FIXME these aren't working yet for some reason
-            # ('::m2::m2_1::m2_1_2::VALUE', 212, 'v2_1_2'),
+            ('::m2::m2_1::m2_1_2::VALUE', 212, 'v2_1_2'),
             ('::m2::m2_2::VALUE', 22, 'v22'),
 
-            # ('VALUE', 212, 'v'),
-            # ('self::VALUE', 212, 'svalue'),
+            ('VALUE', 212, 'v'),
+            ('self::VALUE', 212, 'svalue'),
             ('super::VALUE', 21, 'suvalue'),
             ('self::super::VALUE', 21, 'ssuvalue'),
             ('super::super::VALUE', 2, 'susuvalue'),
             ('self::super::super::VALUE', 2, 'ssusuvalue'),
-            ('super::super::super::VALUE', 0, 'sususuvalue'),
-            ('self::super::super::super::VALUE', 0, 'ssususuvalue'),
+            ('super::super::super::VALUE', 7777, 'sususuvalue'),
+            ('self::super::super::super::VALUE', 7777, 'ssususuvalue'),
         ]
         for (name, value, local) in namelist:
             c = frame.EvaluateExpression(local)

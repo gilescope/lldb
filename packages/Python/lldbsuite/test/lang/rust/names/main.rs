@@ -4,7 +4,7 @@
 
 fn do_nothing() { }
 
-pub static VALUE : u16 = 0;
+pub static VALUE : u16 = 7777;
 
 pub mod m1 {
     pub static VALUE : u16 = 1;

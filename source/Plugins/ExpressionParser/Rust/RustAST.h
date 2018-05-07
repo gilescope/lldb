@@ -125,6 +125,8 @@ public:
 private:
 
   CompilerDeclContext FrameDeclContext(ExecutionContext &exe_ctx, Status &error);
+  bool GetDeclContext(ExecutionContext &exe_ctx, Status &error,
+                      CompilerDeclContext *result);
 
   bool m_self;
   bool m_relative;

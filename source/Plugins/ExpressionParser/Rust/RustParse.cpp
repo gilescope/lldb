@@ -378,27 +378,18 @@ RustPath::FrameDeclContext(ExecutionContext &exe_ctx, Status &error) {
   return CompilerDeclContext();
 }
 
-std::string
-RustPath::Name(ExecutionContext &exe_ctx, Status &error, bool for_expr, bool *simple_name) {
-  std::string name;
-
+bool
+RustPath::GetDeclContext(ExecutionContext &exe_ctx, Status &error,
+                         CompilerDeclContext *result) {
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
-    return std::string();
+    return false;
   }
-
-  // Simplify this function.
-  bool dummy;
-  if (simple_name == nullptr) {
-    simple_name = &dummy;
-  }
-
-  *simple_name = true;
 
   if (!m_relative || m_self || m_supers > 0) {
     CompilerDeclContext decl_ctx = FrameDeclContext(exe_ctx, error);
     if (!decl_ctx) {
-      return std::string();
+      return false;
     }
 
     for (int i = 0; !m_relative || i < m_supers; ++i) {
@@ -408,11 +399,35 @@ RustPath::Name(ExecutionContext &exe_ctx, Status &error, bool for_expr, bool *si
           break;
         }
         error.SetErrorString("too many 'super's");
-        return std::string();
+        return false;
       }
       decl_ctx = next;
     }
 
+    *result = decl_ctx;
+  }
+
+  return true;
+}
+
+std::string
+RustPath::Name(ExecutionContext &exe_ctx, Status &error, bool for_expr, bool *simple_name) {
+  std::string name;
+
+  // Simplify this function.
+  bool dummy;
+  if (simple_name == nullptr) {
+    simple_name = &dummy;
+  }
+
+  *simple_name = true;
+
+  CompilerDeclContext decl_ctx;
+  if (!GetDeclContext(exe_ctx, error, &decl_ctx)) {
+    return std::string();
+  }
+
+  if (decl_ctx) {
     if (!for_expr) {
       name += "::";
     }

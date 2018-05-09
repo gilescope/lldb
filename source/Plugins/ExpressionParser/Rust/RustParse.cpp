@@ -483,31 +483,32 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
 
   std::vector<CompilerDecl> results;
   const ModuleList &module_list = target->GetImages();
-  size_t size = module_list.GetSize();
-  for (size_t i = 0; results.empty() && i < size; ++i) {
-    ModuleSP mod = module_list.GetModuleAtIndex(i);
-    TypeSystem *ts = mod->GetTypeSystemForLanguage(eLanguageTypeRust);
-    if (!ts) {
-      continue;
-    }
-    SymbolFile *symbol_file = ts->GetSymbolFile();
-    if (!symbol_file) {
-      continue;
-    }
-
-    SymbolContext null_sc;
-    CompilerDeclContext found_ns;
-    for (const ConstString &ns_name : fullname) {
-      found_ns = symbol_file->FindNamespace(null_sc, ns_name, &found_ns);
-      if (!found_ns) {
-        break;
+  module_list.ForEach(
+    [&](const ModuleSP &mod) {
+      TypeSystem *ts = mod->GetTypeSystemForLanguage(eLanguageTypeRust);
+      if (!ts) {
+        return true;
       }
-    }
+      SymbolFile *symbol_file = ts->GetSymbolFile();
+      if (!symbol_file) {
+        return true;
+      }
 
-    if (found_ns) {
-      results = found_ns.FindDeclByName(ConstString(name.c_str()), false);
-    }
-  }
+      SymbolContext null_sc;
+      CompilerDeclContext found_ns;
+      for (const ConstString &ns_name : fullname) {
+        found_ns = symbol_file->FindNamespace(null_sc, ns_name, &found_ns);
+        if (!found_ns) {
+          break;
+        }
+      }
+
+      if (found_ns) {
+        results = found_ns.FindDeclByName(ConstString(name.c_str()), false);
+      }
+
+      return results.empty();
+    });
 
   if (results.empty()) {
     error.SetErrorStringWithFormat("could not find decl \"%s\"", name.c_str());

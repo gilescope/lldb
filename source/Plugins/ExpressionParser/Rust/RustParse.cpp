@@ -410,6 +410,7 @@ RustPath::GetDeclContext(ExecutionContext &exe_ctx, Status &error,
     *result = decl_ctx;
   }
 
+  *result = decl_ctx;
   return true;
 }
 
@@ -434,12 +435,12 @@ RustPath::AppendGenerics(ExecutionContext &exe_ctx, Status &error, std::string *
   return true;
 }
 
-CompilerDecl
+lldb::VariableSP
 RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_name) {
   bool simple_name;
   CompilerDeclContext decl_ctx;
   if (!GetDeclContext(exe_ctx, error, &decl_ctx, &simple_name)) {
-    return CompilerDecl();
+    return VariableSP();
   }
 
   if (m_path.size() > 1) {
@@ -448,17 +449,17 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
 
   std::string name = m_path.back();
   if (!AppendGenerics(exe_ctx, error, &name)) {
-    return CompilerDecl();
+    return VariableSP();
   }
 
   if (simple_name) {
     *base_name = name;
-    return CompilerDecl();
+    // ... but still look in the current context.
   }
 
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
-    return CompilerDecl();
+    return VariableSP();
   }
 
   // Construct the fully-qualified name.
@@ -478,10 +479,11 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
   Target *target = exe_ctx.GetTargetPtr();
   if (!target) {
     error.SetErrorString("could not get target to look up item");
-    return CompilerDecl();
+    return VariableSP();
   }
 
-  std::vector<CompilerDecl> results;
+  VariableList results;
+  ConstString cs_name(name.c_str());
   const ModuleList &module_list = target->GetImages();
   module_list.ForEach(
     [&](const ModuleSP &mod) {
@@ -504,18 +506,20 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
       }
 
       if (found_ns) {
-        results = found_ns.FindDeclByName(ConstString(name.c_str()), false);
+        mod->FindGlobalVariables(cs_name, &found_ns, true, 1, results);
       }
 
-      return results.empty();
+      return results.GetSize() == 0;
     });
 
-  if (results.empty()) {
-    error.SetErrorStringWithFormat("could not find decl \"%s\"", name.c_str());
-    return CompilerDecl();
+  if (results.GetSize() == 0) {
+    if (base_name->empty()) {
+      error.SetErrorStringWithFormat("could not find decl \"%s\"", name.c_str());
+    }
+    return VariableSP();
   }
 
-  return results[0];
+  return results.GetVariableAtIndex(0);
 }
 
 std::string
@@ -652,7 +656,7 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
 
   std::string name;
-  CompilerDecl decl = m_path->FindDecl(exe_ctx, error, &name);
+  VariableSP decl = m_path->FindDecl(exe_ctx, error, &name);
   if (error.Fail()) {
     return ValueObjectSP();
   }
@@ -666,24 +670,14 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
         return frame->GetValueObjectForFrameVariable(var, eDynamicDontRunTarget);
       }
     }
-    error.SetErrorStringWithFormat("could not find item \"%s\"", name.c_str());
-    return ValueObjectSP();
-  } else {
-    ConstString mangled = decl.GetMangledName();
-
-    VariableList variable_list;
-    uint32_t num_matches =
-      target->GetImages().FindGlobalVariables(mangled, false, 1, variable_list);
-    if (num_matches > 0) {
-      // FIXME dynamic?
-      return frame->TrackGlobalVariable(variable_list.GetVariableAtIndex(0),
-                                        eDynamicDontRunTarget);
-    }
-
-    error.SetErrorStringWithFormat("could not find item \"%s\"",
-                                   decl.GetName().AsCString());
-    return ValueObjectSP();
   }
+  if (decl) {
+    return frame->TrackGlobalVariable(decl, eDynamicDontRunTarget);
+  }
+
+  // FIXME use the name
+  error.SetErrorStringWithFormat("could not find item");
+  return ValueObjectSP();
 }
 
 lldb::ValueObjectSP

@@ -43,6 +43,8 @@ pub mod m2 {
                 let ssuvalue = self::super::VALUE;
                 let susuvalue = super::super::VALUE;
                 let ssusuvalue = self::super::super::VALUE;
+                let sususuvalue = super::super::super::VALUE;
+                let ssususuvalue = self::super::super::super::VALUE;
 
                 ::do_nothing();   // breakpoint
             }

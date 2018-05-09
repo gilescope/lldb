@@ -16,6 +16,7 @@
 #include "lldb/lldb-private.h"
 #include "lldb/Core/Scalar.h"
 #include "lldb/Symbol/CompilerType.h"
+#include "lldb/Symbol/Variable.h"
 #include "lldb/Utility/Stream.h"
 #include "RustLex.h"
 
@@ -121,7 +122,7 @@ public:
 
   std::string Name(ExecutionContext &exe_ctx, Status &error);
 
-  CompilerDecl FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_name);
+  lldb::VariableSP FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_name);
 
 private:
 

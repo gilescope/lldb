@@ -27,6 +27,10 @@ pub mod m2 {
         pub mod m2_1_2 {
             pub static VALUE : u16 = 212;
 
+            pub mod m2_1_2_1 {
+                pub static VALUE : u16 = 2121;
+            }
+
             pub fn f() {
                 let v0 = ::VALUE;
                 let v1 = ::m1::VALUE;
@@ -45,6 +49,10 @@ pub mod m2 {
                 let ssusuvalue = self::super::super::VALUE;
                 let sususuvalue = super::super::super::VALUE;
                 let ssususuvalue = self::super::super::super::VALUE;
+
+                let rv = m2_1_2_1::VALUE;
+                let srv = self::m2_1_2_1::VALUE;
+                let ssrv = super::m2_1_2::m2_1_2_1::VALUE;
 
                 ::do_nothing();   // breakpoint
             }

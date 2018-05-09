@@ -76,6 +76,10 @@ class TestRustNames(TestBase):
             ('self::super::super::VALUE', 2, 'ssusuvalue'),
             ('super::super::super::VALUE', 7777, 'sususuvalue'),
             ('self::super::super::super::VALUE', 7777, 'ssususuvalue'),
+
+            ('m2_1_2_1::VALUE', 2121, 'rv'),
+            ('self::m2_1_2_1::VALUE', 2121, 'srv'),
+            ('super::m2_1_2::m2_1_2_1::VALUE', 2121, 'srv'),
         ]
         for (name, value, local) in namelist:
             c = frame.EvaluateExpression(local)

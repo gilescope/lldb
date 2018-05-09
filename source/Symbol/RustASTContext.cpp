@@ -1923,11 +1923,16 @@ bool RustASTContext::DeclContextIsClassMethod(void *opaque_decl_ctx,
 std::vector<CompilerDecl>
 RustASTContext::DeclContextFindDeclByName(void *opaque_decl_ctx, ConstString name,
                                           const bool ignore_imported_decls) {
-  RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
   std::vector<CompilerDecl> result;
-  RustDeclBase *base = dc->FindByName(name);
-  if (RustDecl *decl = base ? base->AsDecl() : nullptr) {
-    result.push_back(CompilerDecl(this, decl));
+  SymbolFile *symbol_file = GetSymbolFile();
+  if (symbol_file) {
+    symbol_file->ParseDeclsForContext(CompilerDeclContext(this, opaque_decl_ctx));
+
+    RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
+    RustDeclBase *base = dc->FindByName(name);
+    if (RustDecl *decl = base ? base->AsDecl() : nullptr) {
+      result.push_back(CompilerDecl(this, decl));
+    }
   }
   return result;
 }
@@ -1961,14 +1966,14 @@ RustASTContext::GetNamespaceDecl(CompilerDeclContext parent, const ConstString &
 }
 
 CompilerDeclContext
-RustASTContext::GetDeclContextDeclContext(CompilerDeclContext parent) {
-  if (!parent)
+RustASTContext::GetDeclContextDeclContext(CompilerDeclContext child) {
+  if (!child)
     return CompilerDeclContext();
-  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(child.GetTypeSystem());
   if (!ast)
     return CompilerDeclContext();
 
-  RustDeclContext *dc = (RustDeclContext *) parent.GetOpaqueDeclContext();
+  RustDeclContext *dc = (RustDeclContext *) child.GetOpaqueDeclContext();
   return CompilerDeclContext(this, dc->Context());
 }
 

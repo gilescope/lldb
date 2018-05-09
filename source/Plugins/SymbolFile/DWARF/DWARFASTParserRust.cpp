@@ -1119,6 +1119,10 @@ DWARFASTParserRust::GetDeclContextForUIDFromDWARF(const DWARFDIE &die) {
   }
 
   if (result) {
+    printf(".... NS for <%x> is %s\n",
+           unsigned(die.GetOffset()),
+           result.GetScopeQualifiedName().AsCString()
+           );
     m_decl_contexts[die.GetDIE()] = result;
     m_decl_contexts_to_die.emplace(result, die);
   }
@@ -1148,12 +1152,17 @@ DWARFASTParserRust::GetDeclForUIDFromDWARF(const DWARFDIE &die) {
     return iter->second;
   }
 
+  printf(".... scanning <%x>\n", unsigned(die.GetOffset()));
+
+  // Meh.
+  CompilerDeclContext parent = GetDeclContextForUIDFromDWARF(die);
+
   CompilerDecl result;
   if (die.Tag() == DW_TAG_variable || die.Tag() == DW_TAG_constant) {
     const char *name = die.GetName();
     if (name) {
       const char *mangled = die.GetMangledName();
-      CompilerDeclContext parent = GetDeclContextContainingUIDFromDWARF(die);
+      printf(".... reading %s @ 0x%x\n", mangled, unsigned(die.GetOffset()));
       result = m_ast.GetDecl(parent, ConstString(name), ConstString(mangled));
 
       if (result) {

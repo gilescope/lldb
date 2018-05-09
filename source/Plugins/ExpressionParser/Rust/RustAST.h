@@ -119,14 +119,16 @@ public:
     }
   }
 
-  std::string Name(ExecutionContext &exe_ctx, Status &error,
-                   bool for_expr = false, bool *simple_name = nullptr);
+  std::string Name(ExecutionContext &exe_ctx, Status &error);
+
+  CompilerDecl FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_name);
 
 private:
 
   CompilerDeclContext FrameDeclContext(ExecutionContext &exe_ctx, Status &error);
   bool GetDeclContext(ExecutionContext &exe_ctx, Status &error,
-                      CompilerDeclContext *result);
+                      CompilerDeclContext *result, bool *simple_name);
+  bool AppendGenerics(ExecutionContext &exe_ctx, Status &error, std::string *name);
 
   bool m_self;
   bool m_relative;

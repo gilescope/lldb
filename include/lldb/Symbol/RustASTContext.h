@@ -410,7 +410,7 @@ public:
 
   CompilerDeclContext GetTranslationUnitDecl();
   CompilerDeclContext GetNamespaceDecl(CompilerDeclContext parent, const ConstString &name);
-  CompilerDeclContext GetDeclContextDeclContext(CompilerDeclContext parent);
+  CompilerDeclContext GetDeclContextDeclContext(CompilerDeclContext child);
   CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name,
                        const ConstString &mangled);
 

@@ -10,6 +10,7 @@
 #include "RustParse.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ValueObject.h"
+#include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Symbol/Block.h"
 #include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/SymbolFile.h"
@@ -18,6 +19,9 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/Status.h"
 #include <functional>
+
+#include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
+#include "Plugins/ExpressionParser/Clang/ClangFunctionCaller.h"
 
 using namespace lldb_private::rust;
 using namespace lldb_private;
@@ -878,8 +882,56 @@ RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 lldb::ValueObjectSP
 RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  error.SetErrorString("function calls unimplemented");
-  return ValueObjectSP();
+  ValueObjectSP func = m_func->Evaluate(exe_ctx, error);
+  if (!func) {
+    return func;
+  }
+  if (!func->GetCompilerType().IsFunctionPointerType()) {
+    error.SetErrorString("not calling a function");
+    return ValueObjectSP();
+  }
+  CompilerType return_type = func->GetCompilerType().GetFunctionReturnType();
+
+  addr_t addr = func->GetAddressOf();
+  Address func_addr(addr);
+
+  std::vector<ValueObjectSP> hold;
+  ValueList args;
+  for (auto &&arg : m_exprs) {
+    ValueObjectSP varg = arg->Evaluate(exe_ctx, error);
+    if (!varg) {
+      return varg;
+    }
+    hold.push_back(std::move(varg));
+    args.PushValue(hold.back()->GetValue());
+  }
+
+  // FIXME might be nice to stick the name in there.
+  ClangFunctionCaller call(*exe_ctx.GetBestExecutionContextScope(), return_type, func_addr,
+                           args, nullptr);
+  DiagnosticManager diags;
+  Value results;
+  ExpressionResults ef_result =
+    call.ExecuteFunction(exe_ctx, nullptr, EvaluateExpressionOptions(), diags, results);
+
+  if (ef_result != eExpressionCompleted) {
+    // FIXME use the diagnostics.
+    error.SetErrorString("function call failed");
+    return ValueObjectSP();
+  }
+
+  DataExtractor data;
+  if (!results.GetData(data)) {
+    error.SetErrorString("could not extract return value");
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP result = ValueObject::CreateValueObjectFromData("", data, exe_ctx,
+                                                                return_type);
+  if (!result) {
+    error.SetErrorString("could not create function return value object");
+  }
+  return result;
 }
 
 lldb::ValueObjectSP

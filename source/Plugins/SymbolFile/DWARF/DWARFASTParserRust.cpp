@@ -1029,9 +1029,6 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(const SymbolContext &sc,
 
   assert(die.Tag() == DW_TAG_subprogram);
 
-  if (die.Tag() != DW_TAG_subprogram)
-    return NULL;
-
   if (die.GetDIENamesAndRanges(name, mangled, func_ranges, decl_file, decl_line,
                                decl_column, call_file, call_line, call_column,
                                &frame_base)) {

@@ -122,7 +122,9 @@ public:
 
   std::string Name(ExecutionContext &exe_ctx, Status &error);
 
-  lldb::VariableSP FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_name);
+  bool FindDecl(ExecutionContext &exe_ctx, Status &error,
+                lldb::VariableSP *var, lldb_private::Function **function,
+                std::string *base_name);
 
 private:
 

@@ -12,6 +12,7 @@
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Symbol/Block.h"
+#include "lldb/Symbol/Function.h"
 #include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/TypeList.h"
@@ -439,12 +440,15 @@ RustPath::AppendGenerics(ExecutionContext &exe_ctx, Status &error, std::string *
   return true;
 }
 
-lldb::VariableSP
-RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_name) {
+bool
+RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
+                   lldb::VariableSP *var,
+                   lldb_private::Function **function,
+                   std::string *base_name) {
   bool simple_name;
   CompilerDeclContext decl_ctx;
   if (!GetDeclContext(exe_ctx, error, &decl_ctx, &simple_name)) {
-    return VariableSP();
+    return false;
   }
 
   if (m_path.size() > 1) {
@@ -453,7 +457,7 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
 
   std::string name = m_path.back();
   if (!AppendGenerics(exe_ctx, error, &name)) {
-    return VariableSP();
+    return false;
   }
 
   if (simple_name) {
@@ -463,7 +467,7 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
 
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
-    return VariableSP();
+    return false;
   }
 
   // Construct the fully-qualified name.
@@ -483,10 +487,11 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
   Target *target = exe_ctx.GetTargetPtr();
   if (!target) {
     error.SetErrorString("could not get target to look up item");
-    return VariableSP();
+    return false;
   }
 
-  VariableList results;
+  VariableList var_list;
+  *function = nullptr;
   ConstString cs_name(name.c_str());
   const ModuleList &module_list = target->GetImages();
   module_list.ForEach(
@@ -510,20 +515,35 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error, std::string *base_n
       }
 
       if (found_ns) {
-        mod->FindGlobalVariables(cs_name, &found_ns, true, 1, results);
+        mod->FindGlobalVariables(cs_name, &found_ns, true, 1, var_list);
+
+        SymbolContextList context_list;
+        mod->FindFunctions(cs_name, &found_ns, eFunctionNameTypeBase, false, false,
+                           true, context_list);
+        for (size_t i = 0; i < context_list.GetSize(); ++i) {
+          SymbolContext sym_context;
+          if (context_list.GetContextAtIndex(i, sym_context) && sym_context.function) {
+            *function = sym_context.function;
+            break;
+          }
+        }
       }
 
-      return results.GetSize() == 0;
+      return var_list.GetSize() == 0 && *function == nullptr;
     });
 
-  if (results.GetSize() == 0) {
+  if (var_list.GetSize() != 0) {
+    *var = var_list.GetVariableAtIndex(0);
+  } else if (*function != nullptr) {
+    // Ok.
+  } else {
     if (base_name->empty()) {
       error.SetErrorStringWithFormat("could not find decl \"%s\"", name.c_str());
     }
-    return VariableSP();
+    return false;
   }
 
-  return results.GetVariableAtIndex(0);
+  return true;
 }
 
 std::string
@@ -660,7 +680,9 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
 
   std::string name;
-  VariableSP decl = m_path->FindDecl(exe_ctx, error, &name);
+  VariableSP decl;
+  Function *function;
+  m_path->FindDecl(exe_ctx, error, &decl, &function, &name);
   if (error.Fail()) {
     return ValueObjectSP();
   }
@@ -677,6 +699,14 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
   if (decl) {
     return frame->TrackGlobalVariable(decl, eDynamicDontRunTarget);
+  }
+
+  if (function) {
+    Address addr = function->GetAddressRange().GetBaseAddress();
+    addr_t address = addr.GetCallableLoadAddress(target);
+    CompilerType type = function->GetCompilerType().GetPointerType();
+    Scalar saddr(address);
+    return CreateValueFromScalar(exe_ctx, saddr, type, error);
   }
 
   // FIXME use the name
@@ -892,7 +922,7 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
   CompilerType return_type = func->GetCompilerType().GetFunctionReturnType();
 
-  addr_t addr = func->GetAddressOf();
+  addr_t addr = func->GetPointerValue();
   Address func_addr(addr);
 
   std::vector<ValueObjectSP> hold;

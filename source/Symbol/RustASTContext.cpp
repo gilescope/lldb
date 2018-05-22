@@ -909,7 +909,11 @@ RustASTContext::GetFunctionArgumentAtIndex(lldb::opaque_compiler_type_t type,
 }
 
 bool RustASTContext::IsFunctionPointerType(lldb::opaque_compiler_type_t type) {
-  return IsFunctionType(type);
+  CompilerType pointee;
+  if (!IsPointerType(type, &pointee)) {
+    return false;
+  }
+  return pointee.IsFunctionType();
 }
 
 bool RustASTContext::IsBlockPointerType(lldb::opaque_compiler_type_t type,

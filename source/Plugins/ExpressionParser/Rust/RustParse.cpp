@@ -20,6 +20,7 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Utility/Status.h"
 #include <functional>
+#include <set>
 
 #include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
 #include "Plugins/ExpressionParser/Clang/ClangFunctionCaller.h"
@@ -28,6 +29,14 @@ using namespace lldb_private::rust;
 using namespace lldb_private;
 using namespace lldb;
 using namespace llvm;
+
+static std::set<std::string> primitive_type_names
+  {
+   "bool", "char",
+   "u8", "u16", "u32", "u64", "u128",
+   "i8", "i16", "i32", "i64", "i128",
+   "f32", "f64"
+  };
 
 static RustASTContext *
 GetASTContext(ValueObjectSP val, Status &error) {
@@ -554,6 +563,12 @@ RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
   bool ignore;
   if (!GetDeclContext(exe_ctx, error, &decl_ctx, &ignore)) {
     return std::string();
+  }
+
+  if (m_path.size() == 1 &&
+      primitive_type_names.find(m_path[0]) != primitive_type_names.end()) {
+    // Primitive.
+    return m_path[0];
   }
 
   // FIXME local types

@@ -935,7 +935,7 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     error.SetErrorString("not calling a function");
     return ValueObjectSP();
   }
-  CompilerType return_type = func->GetCompilerType().GetFunctionReturnType();
+  CompilerType return_type = func->GetCompilerType().GetPointeeType().GetFunctionReturnType();
 
   addr_t addr = func->GetPointerValue();
   Address func_addr(addr);

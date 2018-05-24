@@ -414,6 +414,9 @@ public:
   CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name,
                        const ConstString &mangled);
 
+  bool GetCABITypeDeclaration(CompilerType type, const std::string &varname,
+                              std::string *result);
+
 private:
   int m_pointer_byte_size;
   std::map<ConstString, std::unique_ptr<RustType>> m_types;

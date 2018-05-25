@@ -160,7 +160,7 @@ public:
     if (!m_is_signed) {
       result += "u";
     }
-    result += "int" + std::to_string(8 * m_byte_size) + " " + varname;
+    result += "int" + std::to_string(8 * m_byte_size) + "_t " + varname;
     return result;
   }
 
@@ -618,7 +618,7 @@ public:
     // (This is unwarranted compiler knowledge - FIXME.)  If there are
     // zero or one fields then there is no discriminant.
     if (FieldCount() > 1 && m_discr_offset == 0) {
-      result += "int" + std::to_string(8 * m_discr_byte_size) + " __discr; ";
+      result += "int" + std::to_string(8 * m_discr_byte_size) + "_t __discr; ";
     }
     result += GetFieldsCABITypeDeclaration() + " } " + varname;
     return result;

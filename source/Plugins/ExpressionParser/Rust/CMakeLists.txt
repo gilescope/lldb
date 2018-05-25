@@ -1,5 +1,5 @@
 add_lldb_library(lldbPluginExpressionParserRust PLUGIN
-	RustUserExpression.cpp RustLex.cpp RustParse.cpp
+	RustUserExpression.cpp RustLex.cpp RustParse.cpp RustFunctionCaller.cpp
 
   LINK_LIBS
     lldbCore

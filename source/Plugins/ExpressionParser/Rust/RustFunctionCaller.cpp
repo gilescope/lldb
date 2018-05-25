@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
 #include "RustFunctionCaller.h"
 
 #include "Plugins/ExpressionParser/Clang/ClangExpressionParser.h"
@@ -42,15 +43,14 @@ using namespace lldb_private;
 // RustFunctionCaller constructor
 //----------------------------------------------------------------------
 RustFunctionCaller::RustFunctionCaller(ExecutionContextScope &exe_scope,
+                                       const CompilerType &function_type,
                                        const CompilerType &return_type,
                                        const Address &functionAddress,
                                        const ValueList &arg_value_list,
                                        const char *name)
-  : FunctionCaller(exe_scope, return_type, functionAddress, arg_value_list,
-                   name) {
-  m_jit_process_wp = lldb::ProcessWP(exe_scope.CalculateProcess());
-  // Can't make a RustFunctionCaller without a process.
-  assert(m_jit_process_wp.lock());
+  : ClangFunctionCaller(exe_scope, return_type, functionAddress, arg_value_list, name),
+    m_function_type(function_type)
+{
 }
 
 //----------------------------------------------------------------------
@@ -92,27 +92,36 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   // We declare the function "extern "C"" because the compiler might be in C++
   // mode which would mangle the name and then we couldn't find it again...
   m_wrapper_function_text.clear();
+
+  // A prologue to handle Rust primitive types.
+  m_wrapper_function_text.append("typedef unsigned int __attribute__((mode(QI))) uint8_t;\n");
+  m_wrapper_function_text.append("typedef int __attribute__((mode(QI))) int8_t;\n");
+  m_wrapper_function_text.append("typedef unsigned int __attribute__((mode(HI))) uint16_t;\n");
+  m_wrapper_function_text.append("typedef int __attribute__((mode(HI))) int16_t;\n");
+  m_wrapper_function_text.append("typedef unsigned int __attribute__((mode(SI))) uint32_t;\n");
+  m_wrapper_function_text.append("typedef int __attribute__((mode(SI))) int32_t;\n");
+  m_wrapper_function_text.append("typedef unsigned int __attribute__((mode(DI))) uint64_t;\n");
+  m_wrapper_function_text.append("typedef int __attribute__((mode(DI))) int64_t;\n");
+
   m_wrapper_function_text.append("extern \"C\" void ");
   m_wrapper_function_text.append(m_wrapper_function_name);
   m_wrapper_function_text.append(" (void *input)\n{\n  struct ");
   m_wrapper_function_text.append(m_wrapper_struct_name);
   m_wrapper_function_text.append(" {\n");
 
-  CompilerType function_type = m_function_ptr->GetCompilerType().GetPointeeType();
-
-  if (!AppendType(&m_wrapper_function_text, ast, "fn_ptr", function_type)
+  if (!AppendType(&m_wrapper_function_text, ast, "fn_ptr", m_function_type)
       || !AppendType(&m_wrapper_function_text, ast, "result",
-                     function_type.GetFunctionReturnType())) {
+                     m_function_type.GetFunctionReturnType())) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
                                  "could not compute Rust type declaration");
     return 1;
   }
 
   std::string arguments;
-  for (int i = 0; i < function_type.GetFunctionArgumentCount(); ++i) {
+  for (int i = 0; i < m_function_type.GetFunctionArgumentCount(); ++i) {
     std::string argname = "__arg_" + std::to_string(i);
     if (!AppendType(&m_wrapper_function_text, ast, argname,
-                    function_type.GetFunctionArgumentTypeAtIndex(i))) {
+                    m_function_type.GetFunctionArgumentTypeAtIndex(i))) {
       diagnostic_manager.PutString(eDiagnosticSeverityError,
                                    "could not compute Rust type declaration");
       return 1;
@@ -126,13 +135,13 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
 
   m_wrapper_function_text.append("  };\n");
 
-  m_wrapper_function_text.append("  struct ");
+  m_wrapper_function_text.append("  ");
   m_wrapper_function_text.append(m_wrapper_struct_name);
   m_wrapper_function_text.append(" *__lldb_fn_data = (");
   m_wrapper_function_text.append(m_wrapper_struct_name);
   m_wrapper_function_text.append(" *) input;\n");
 
-  m_wrapper_function_text.append("__lldb_fn_data->result = __lldb_fn_data->fn_ptr(");
+  m_wrapper_function_text.append("  __lldb_fn_data->result = __lldb_fn_data->fn_ptr(");
   m_wrapper_function_text.append(arguments);
   m_wrapper_function_text.append(");\n}\n");
 

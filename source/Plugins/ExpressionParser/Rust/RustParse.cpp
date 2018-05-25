@@ -23,7 +23,7 @@
 #include <set>
 
 #include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
-#include "Plugins/ExpressionParser/Clang/ClangFunctionCaller.h"
+#include "RustFunctionCaller.h"
 
 using namespace lldb_private::rust;
 using namespace lldb_private;
@@ -935,7 +935,8 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     error.SetErrorString("not calling a function");
     return ValueObjectSP();
   }
-  CompilerType return_type = func->GetCompilerType().GetPointeeType().GetFunctionReturnType();
+  CompilerType function_type = func->GetCompilerType().GetPointeeType();
+  CompilerType return_type = function_type.GetFunctionReturnType();
 
   addr_t addr = func->GetPointerValue();
   Address func_addr(addr);
@@ -954,8 +955,8 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   // FIXME must cast each argument to the correct type here.
 
   // FIXME might be nice to stick the name in there.
-  ClangFunctionCaller call(*exe_ctx.GetBestExecutionContextScope(), return_type, func_addr,
-                           args, nullptr);
+  RustFunctionCaller call(*exe_ctx.GetBestExecutionContextScope(), function_type,
+                          return_type, func_addr, args, nullptr);
   DiagnosticManager diags;
   Value results;
   ExpressionResults ef_result =

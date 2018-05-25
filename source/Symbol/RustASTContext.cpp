@@ -680,7 +680,7 @@ public:
   std::string GetCABITypeDeclaration(const std::string &varname) override {
     RustType *type = (RustType *) m_return_type.GetOpaqueQualType();
 
-    std::string result = "(" + type->GetCABITypeDeclaration("") + ") (*" +
+    std::string result = type->GetCABITypeDeclaration("") + " (*" +
       varname + ")(";
     bool first = true;
     for (CompilerType &iter : m_arguments) {

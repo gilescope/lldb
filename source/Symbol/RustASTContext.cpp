@@ -291,6 +291,13 @@ public:
   }
 
   std::string GetCABITypeDeclaration(const std::string &varname) override {
+    RustType *p_type = (RustType *) m_pointee.GetOpaqueQualType();
+    if (p_type->AsFunction()) {
+      // This does the right thing, see the implementation.
+      return p_type->GetCABITypeDeclaration(varname);
+    }
+    // Otherwise, treat all pointers the same way - it doesn't matter
+    // for the ABI.
     return "void *" + varname;
   }
 

@@ -109,9 +109,9 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   m_wrapper_function_text.append(m_wrapper_struct_name);
   m_wrapper_function_text.append(" {\n");
 
-  if (!AppendType(&m_wrapper_function_text, ast, "fn_ptr", m_function_type)
-      || !AppendType(&m_wrapper_function_text, ast, "result",
-                     m_function_type.GetFunctionReturnType())) {
+  // ASTStructExtractor requires the first argument to be the
+  // function.
+  if (!AppendType(&m_wrapper_function_text, ast, "fn_ptr", m_function_type)) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
                                  "could not compute Rust type declaration");
     return 1;
@@ -131,6 +131,14 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
     }
     arguments.append("__lldb_fn_data->");
     arguments.append(argname);
+  }
+
+  // ASTStructExtractor requires that the last field hold the result.
+  if (!AppendType(&m_wrapper_function_text, ast, "result",
+                  m_function_type.GetFunctionReturnType())) {
+    diagnostic_manager.PutString(eDiagnosticSeverityError,
+                                 "could not compute Rust type declaration");
+    return 1;
   }
 
   m_wrapper_function_text.append("  };\n");

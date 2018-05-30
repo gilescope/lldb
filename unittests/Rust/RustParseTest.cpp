@@ -92,13 +92,15 @@ TEST(RustParseTest, Calls) {
 
 TEST(RustParseTest, Paths) {
   TestParse("self", "self");
-  TestParse("self::super::hi", "super::hi");
-  TestParse("self::hi::there", "hi::there");
-  TestParse("self::super::super::super::hi", "super::super::super::hi");
+  TestParse("self::super::hi", "self::super::hi");
+  TestParse("self::hi::there", "self::hi::there");
+  TestParse("self::super::super::super::hi", "self::super::super::super::hi");
   TestParse("::hi::there", "::hi::there");
   TestParse("hi::there", "hi::there");
-  TestParse("hi::there::<bool>", "hi::there::<bool>");
-  TestParse("hi::there::<something<bool>>", "hi::there::<something<bool>>");
+  // These lose the turbofish but that doesn't seem very important, as
+  // this is only visible when dumping the AST.
+  TestParse("hi::there::<bool>", "hi::there<bool>");
+  TestParse("hi::there::<something<bool>>", "hi::there<something<bool>>");
 }
 
 TEST(RustParseTest, Types) {

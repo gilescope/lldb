@@ -414,8 +414,29 @@ public:
   CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name,
                        const ConstString &mangled);
 
+  // When emitting a call we need to emit tags for the aggregate
+  // types, so that we can avoid trying to define a type in a function
+  // parameter.  This class manages the names.
+  struct TypeNameMap {
+    std::map<RustType *, std::string> name_map;
+    unsigned counter = 0;
+    // Holds the source code for the typedefs themselves.
+    std::string typedefs;
+
+    bool Tag(RustType *type, std::string *tagname) {
+      auto iter = name_map.find(type);
+      if (iter == name_map.end()) {
+        *tagname = "tag" + std::to_string(counter++);
+        name_map[type] = *tagname;
+        return true;
+      }
+      *tagname = iter->second;
+      return false;
+    }
+  };
+
   bool GetCABITypeDeclaration(CompilerType type, const std::string &varname,
-                              std::string *result);
+                              TypeNameMap *name_map, std::string *result);
 
 private:
   int m_pointer_byte_size;

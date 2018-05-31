@@ -59,10 +59,10 @@ RustFunctionCaller::RustFunctionCaller(ExecutionContextScope &exe_scope,
 RustFunctionCaller::~RustFunctionCaller() {}
 
 static bool
-AppendType(std::string *output, RustASTContext *ast, const std::string &varname,
-           CompilerType type) {
+AppendType(std::string *output, RustASTContext *ast, RustASTContext::TypeNameMap *name_map,
+           const std::string &varname, CompilerType type) {
   std::string value;
-  if (!ast->GetCABITypeDeclaration(type, varname, &value)) {
+  if (!ast->GetCABITypeDeclaration(type, varname, name_map, &value)) {
     return false;
   }
   output->append("    ");
@@ -105,13 +105,26 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
 
   m_wrapper_function_text.append("extern \"C\" void ");
   m_wrapper_function_text.append(m_wrapper_function_name);
-  m_wrapper_function_text.append(" (void *input)\n{\n  struct ");
-  m_wrapper_function_text.append(m_wrapper_struct_name);
-  m_wrapper_function_text.append(" {\n");
+  m_wrapper_function_text.append(" (void *input)\n{\n");
+
+  // For the Itanium ABI we want to generate a non-standard-layout
+  // type, so that ASTStructExtractor can see the length of the type
+  // without padding, so that the size of the final element is
+  // correct.  FIXME this seems horrible, maybe a fix in
+  // ASTStructExtractor is more appropriate.
+  m_wrapper_function_text.append("  struct empty { };\n");
+  m_wrapper_function_text.append("  struct a : empty { };\n");
+  m_wrapper_function_text.append("  struct b : empty { };\n");
+
+  RustASTContext::TypeNameMap name_map;
+  std::string code;
+  code.append("  struct ");
+  code.append(m_wrapper_struct_name);
+  code.append(" : a, b {\n");
 
   // ASTStructExtractor requires the first argument to be the
   // function.
-  if (!AppendType(&m_wrapper_function_text, ast, "fn_ptr", m_function_type)) {
+  if (!AppendType(&code, ast, &name_map, "fn_ptr", m_function_type)) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
                                  "could not compute Rust type declaration");
     return 1;
@@ -120,7 +133,7 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   std::string arguments;
   for (int i = 0; i < m_function_type.GetFunctionArgumentCount(); ++i) {
     std::string argname = "__arg_" + std::to_string(i);
-    if (!AppendType(&m_wrapper_function_text, ast, argname,
+    if (!AppendType(&code, ast, &name_map, argname,
                     m_function_type.GetFunctionArgumentTypeAtIndex(i))) {
       diagnostic_manager.PutString(eDiagnosticSeverityError,
                                    "could not compute Rust type declaration");
@@ -134,30 +147,15 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   }
 
   // ASTStructExtractor requires that the last field hold the result.
-  // Also, because ASTStructExtractor assumes that there is no padding
-  // after the result field, we promote the result type in some cases.
-  uint32_t u_ignore;
-  bool b_ignore;
-  bool is_signed;
-  std::string rtypename;
-  CompilerType rtype = m_function_type.GetFunctionReturnType();
-  if (rtype.IsFloatingPointType(u_ignore, b_ignore)) {
-    rtypename = "double result";
-  } else if (rtype.IsIntegerOrEnumerationType(is_signed)) {
-    rtypename = is_signed ? "int64_t result" : "uint64_t result";
-  } else if (ast->IsBooleanType(rtype.GetOpaqueQualType())) {
-    rtypename = "uint64_t result";
-  } else {
-    if (!ast->GetCABITypeDeclaration(rtype, "result", &rtypename)) {
-      diagnostic_manager.PutString(eDiagnosticSeverityError,
-                                   "could not compute Rust type declaration");
-      return 1;
-    }
+  if (!AppendType(&code, ast, &name_map, "result",
+                  m_function_type.GetFunctionReturnType())) {
+    diagnostic_manager.PutString(eDiagnosticSeverityError,
+                                 "could not compute Rust type declaration");
+    return 1;
   }
-  m_wrapper_function_text.append("    ");
-  m_wrapper_function_text.append(rtypename);
-  m_wrapper_function_text.append(";\n");
 
+  m_wrapper_function_text.append(name_map.typedefs);
+  m_wrapper_function_text.append(code);
 
   m_wrapper_function_text.append("  };\n");
 

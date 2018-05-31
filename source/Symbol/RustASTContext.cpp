@@ -65,7 +65,8 @@ public:
     return eFormatBytes;
   }
 
-  virtual std::string GetCABITypeDeclaration(const std::string &varname) = 0;
+  virtual std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                             const std::string &varname) = 0;
 
   virtual uint32_t TypeInfo(CompilerType *element_type) const = 0;
   virtual lldb::TypeClass TypeClass() const = 0;
@@ -115,7 +116,8 @@ public:
     return 1;
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     return "bool " + varname;
   }
 };
@@ -155,7 +157,8 @@ public:
     return eTypeClassBuiltin;
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     std::string result;
     if (!m_is_signed) {
       result += "u";
@@ -214,9 +217,10 @@ public:
     return true;
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     RustType *type = (RustType *) m_underlying_type.GetOpaqueQualType();
-    return type->GetCABITypeDeclaration(varname);
+    return type->GetCABITypeDeclaration(name_map, varname);
   }
 
 private:
@@ -249,7 +253,8 @@ public:
 
   uint64_t ByteSize() const override { return m_byte_size; }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     return (m_byte_size == 4 ? "float " : "double ") + varname;
   }
 
@@ -290,11 +295,12 @@ public:
     return m_byte_size;
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     RustType *p_type = (RustType *) m_pointee.GetOpaqueQualType();
     if (p_type->AsFunction()) {
       // This does the right thing, see the implementation.
-      return p_type->GetCABITypeDeclaration(varname);
+      return p_type->GetCABITypeDeclaration(name_map, varname);
     }
     // Otherwise, treat all pointers the same way - it doesn't matter
     // for the ABI.
@@ -335,9 +341,11 @@ public:
     return m_elem.GetByteSize(nullptr) * m_length;
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     RustType *type = (RustType *) m_elem.GetOpaqueQualType();
-    return type->GetCABITypeDeclaration(varname) + "[" + std::to_string(m_length) + "]";
+    return type->GetCABITypeDeclaration(name_map, varname)
+      + "[" + std::to_string(m_length) + "]";
   }
 
 private:
@@ -438,7 +446,7 @@ public:
 
 protected:
 
-  std::string GetFieldsCABITypeDeclaration() {
+  std::string GetFieldsCABITypeDeclaration(RustASTContext::TypeNameMap *name_map) {
     int argno = 0;
     std::string result;
     for (const Field &f : m_fields) {
@@ -449,7 +457,7 @@ protected:
       } else {
         name = f.m_name.AsCString();
       }
-      result += rtype->GetCABITypeDeclaration(name) + "; ";
+      result += rtype->GetCABITypeDeclaration(name_map, name) + "; ";
     }
     return result;
   }
@@ -491,8 +499,15 @@ public:
     return ")";
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
-    return "struct { " + GetFieldsCABITypeDeclaration() + " } " + varname;
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
+    std::string tagname;
+    if (name_map->Tag(this, &tagname)) {
+      std::string def = "  struct " + tagname + "{"
+        + GetFieldsCABITypeDeclaration(name_map) + " };\n";
+      name_map->typedefs.append(def);
+    }
+    return tagname + " " + varname;
   }
 
 private:
@@ -524,8 +539,15 @@ public:
     return "}";
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
-    return "struct { " + GetFieldsCABITypeDeclaration() + " } " + varname;
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
+    std::string tagname;
+    if (name_map->Tag(this, &tagname)) {
+      std::string def = "  struct " + tagname + "{"
+        + GetFieldsCABITypeDeclaration(name_map) + " };\n";
+      name_map->typedefs.append(def);
+    }
+    return tagname + " " + varname;
   }
 };
 
@@ -547,8 +569,15 @@ public:
     return "}";
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
-    return "union { " + GetFieldsCABITypeDeclaration() + " } " + varname;
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
+    std::string tagname;
+    if (name_map->Tag(this, &tagname)) {
+      std::string def = "  union " + tagname + "{"
+        + GetFieldsCABITypeDeclaration(name_map) + " };\n";
+      name_map->typedefs.append(def);
+    }
+    return tagname + " " + varname;
   }
 };
 
@@ -610,18 +639,23 @@ public:
     }
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
-    std::string result = "struct { ";
-    // If the discriminant comes first, then it is a hidden field,
-    // which we'll emit.  Otherwise, it is in a hole somewhere, or
-    // perhaps overlaid with some other field, so we don't bother.
-    // (This is unwarranted compiler knowledge - FIXME.)  If there are
-    // zero or one fields then there is no discriminant.
-    if (FieldCount() > 1 && m_discr_offset == 0) {
-      result += "int" + std::to_string(8 * m_discr_byte_size) + "_t __discr; ";
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
+    std::string tagname;
+    if (name_map->Tag(this, &tagname)) {
+      std::string def = "struct " + tagname + "{ ";
+      // If the discriminant comes first, then it is a hidden field,
+      // which we'll emit.  Otherwise, it is in a hole somewhere, or
+      // perhaps overlaid with some other field, so we don't bother.
+      // (This is unwarranted compiler knowledge - FIXME.)  If there are
+      // zero or one fields then there is no discriminant.
+      if (FieldCount() > 1 && m_discr_offset == 0) {
+        def += "int" + std::to_string(8 * m_discr_byte_size) + "_t __discr; ";
+      }
+      def += GetFieldsCABITypeDeclaration(name_map) + " };\n";
+      name_map->typedefs.append(def);
     }
-    result += GetFieldsCABITypeDeclaration() + " } " + varname;
-    return result;
+    return tagname + " " + varname;
   }
 
 private:
@@ -677,10 +711,11 @@ public:
     return m_byte_size;
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     RustType *type = (RustType *) m_return_type.GetOpaqueQualType();
 
-    std::string result = type->GetCABITypeDeclaration("") + " (*" +
+    std::string result = type->GetCABITypeDeclaration(name_map, "") + " (*" +
       varname + ")(";
     bool first = true;
     for (CompilerType &iter : m_arguments) {
@@ -689,7 +724,7 @@ public:
         result += ", ";
       }
       first = false;
-      result += type->GetCABITypeDeclaration("");
+      result += type->GetCABITypeDeclaration(name_map, "");
     }
 
     return result + ")";
@@ -728,9 +763,10 @@ public:
     return m_type.GetByteSize(nullptr);
   }
 
-  std::string GetCABITypeDeclaration(const std::string &varname) override {
+  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+                                     const std::string &varname) override {
     RustType *type = (RustType *) m_type.GetOpaqueQualType();
-    return type->GetCABITypeDeclaration(varname);
+    return type->GetCABITypeDeclaration(name_map, varname);
   }
 
 private:
@@ -2110,6 +2146,7 @@ CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent, const ConstStri
 }
 
 bool RustASTContext::GetCABITypeDeclaration(CompilerType type, const std::string &varname,
+                                            RustASTContext::TypeNameMap *name_map,
                                             std::string *result) {
   if (!type)
     return false;
@@ -2117,6 +2154,6 @@ bool RustASTContext::GetCABITypeDeclaration(CompilerType type, const std::string
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
-  *result = rtype->GetCABITypeDeclaration(varname);
+  *result = rtype->GetCABITypeDeclaration(name_map, varname);
   return true;
 }

@@ -134,12 +134,30 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   }
 
   // ASTStructExtractor requires that the last field hold the result.
-  if (!AppendType(&m_wrapper_function_text, ast, "result",
-                  m_function_type.GetFunctionReturnType())) {
-    diagnostic_manager.PutString(eDiagnosticSeverityError,
-                                 "could not compute Rust type declaration");
-    return 1;
+  // Also, because ASTStructExtractor assumes that there is no padding
+  // after the result field, we promote the result type in some cases.
+  uint32_t u_ignore;
+  bool b_ignore;
+  bool is_signed;
+  std::string rtypename;
+  CompilerType rtype = m_function_type.GetFunctionReturnType();
+  if (rtype.IsFloatingPointType(u_ignore, b_ignore)) {
+    rtypename = "double result";
+  } else if (rtype.IsIntegerOrEnumerationType(is_signed)) {
+    rtypename = is_signed ? "int64_t result" : "uint64_t result";
+  } else if (ast->IsBooleanType(rtype.GetOpaqueQualType())) {
+    rtypename = "uint64_t result";
+  } else {
+    if (!ast->GetCABITypeDeclaration(rtype, "result", &rtypename)) {
+      diagnostic_manager.PutString(eDiagnosticSeverityError,
+                                   "could not compute Rust type declaration");
+      return 1;
+    }
   }
+  m_wrapper_function_text.append("    ");
+  m_wrapper_function_text.append(rtypename);
+  m_wrapper_function_text.append(";\n");
+
 
   m_wrapper_function_text.append("  };\n");
 

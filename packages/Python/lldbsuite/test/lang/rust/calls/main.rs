@@ -71,7 +71,8 @@ pub fn sum(a: u8, b: u16, c: u32, d: f32, e: f64) -> f64 {
 fn main() {
     let a = not(false);
     let b = constant();
-    let c = cst2(());
+    let zzq = ();
+    let c = cst2(zzq);
     let d = nil();
     let e = add1(7);
     let f = add1d(7.0);

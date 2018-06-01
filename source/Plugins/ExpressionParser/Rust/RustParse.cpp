@@ -948,8 +948,19 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     if (!varg) {
       return varg;
     }
-    hold.push_back(std::move(varg));
-    args.PushValue(hold.back()->GetValue());
+    hold.push_back(varg);
+
+    // FIXME - mega hack to work around FunctionCaller limitation.
+    // Ideally this would be hidden in RustFunctionCaller at least.
+    if (varg->GetCompilerType().IsAggregateType()) {
+      varg = varg->AddressOf(error);
+      if (!varg) {
+        return varg;
+      }
+      hold.push_back(varg);
+    }
+
+    args.PushValue(varg->GetValue());
   }
 
   // FIXME must cast each argument to the correct type here.

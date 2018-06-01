@@ -302,9 +302,7 @@ public:
       // This does the right thing, see the implementation.
       return p_type->GetCABITypeDeclaration(name_map, varname);
     }
-    // Otherwise, treat all pointers the same way - it doesn't matter
-    // for the ABI.
-    return "void *" + varname;
+    return p_type->GetCABITypeDeclaration(name_map, "") + "* " + varname;
   }
 
 private:

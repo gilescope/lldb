@@ -132,15 +132,24 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
 
   std::string arguments;
   for (int i = 0; i < m_function_type.GetFunctionArgumentCount(); ++i) {
+    CompilerType arg_type = m_function_type.GetFunctionArgumentTypeAtIndex(i);
+    // FIXME work around a FunctionCaller problem.
+    bool is_aggregate = arg_type.IsAggregateType();
+    if (is_aggregate) {
+      arg_type = arg_type.GetPointerType();
+    }
+
     std::string argname = "__arg_" + std::to_string(i);
-    if (!AppendType(&code, ast, &name_map, argname,
-                    m_function_type.GetFunctionArgumentTypeAtIndex(i))) {
+    if (!AppendType(&code, ast, &name_map, argname, arg_type)) {
       diagnostic_manager.PutString(eDiagnosticSeverityError,
                                    "could not compute Rust type declaration");
       return 1;
     }
     if (i > 0) {
       arguments.append(", ");
+    }
+    if (is_aggregate) {
+      arguments.append("*");
     }
     arguments.append("__lldb_fn_data->");
     arguments.append(argname);

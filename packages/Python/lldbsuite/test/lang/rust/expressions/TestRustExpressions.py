@@ -147,6 +147,8 @@ class TestRustExpressions(TestBase):
         self.assertEqual("(main::Struct) * = (field1 = 8, field2 = 'c')", str(v))
         v = frame.EvaluateExpression("Struct { field1: 8, .. vstruct}")
         self.assertEqual("(main::Struct) * = (field1 = 8, field2 = 'Q')", str(v))
+        v = frame.EvaluateExpression("TupleStruct(24, 'R')")
+        self.assertEqual("(main::TupleStruct) * = (24, 'R')", str(v))
         v = frame.EvaluateExpression("0..5")
         self.assertEqual("(core::ops::range::Range<i32>) * = (start = 0, end = 5)", str(v))
         # v = frame.EvaluateExpression("0..=5")

@@ -120,14 +120,15 @@ public:
     }
   }
 
-  std::string Name(ExecutionContext &exe_ctx, Status &error);
-
   bool FindDecl(ExecutionContext &exe_ctx, Status &error,
                 lldb::VariableSP *var, lldb_private::Function **function,
                 std::string *base_name);
 
+  CompilerType EvaluateAsType(ExecutionContext &exe_ctx, Status &error);
+
 private:
 
+  std::string Name(ExecutionContext &exe_ctx, Status &error);
   CompilerDeclContext FrameDeclContext(ExecutionContext &exe_ctx, Status &error);
   bool GetDeclContext(ExecutionContext &exe_ctx, Status &error,
                       CompilerDeclContext *result, bool *simple_name);
@@ -141,6 +142,8 @@ private:
   bool m_turbofish;
 };
 
+class RustPathExpression;
+
 class RustExpression {
 protected:
 
@@ -153,6 +156,10 @@ public:
   virtual void print(Stream &stream) = 0;
 
   virtual lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) = 0;
+
+  virtual RustPathExpression *AsPath() {
+    return nullptr;
+  }
 };
 
 typedef lldb::ValueObjectSP (*RustUnaryOperator)(ExecutionContext &, lldb::ValueObjectSP,
@@ -565,6 +572,8 @@ public:
 
 private:
 
+  lldb::ValueObjectSP MaybeEvalTupleStruct(ExecutionContext &exe_ctx, Status &error);
+
   RustExpressionUP m_func;
   std::vector<RustExpressionUP> m_exprs;
 
@@ -612,7 +621,15 @@ public:
     m_path->print(stream);
   }
 
+  CompilerType EvaluateAsType(ExecutionContext &exe_ctx, Status &error) {
+    return m_path->EvaluateAsType(exe_ctx, error);
+  }
+
   lldb::ValueObjectSP Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+
+  RustPathExpression *AsPath() override {
+    return this;
+  }
 
 private:
 
@@ -685,7 +702,9 @@ public:
     m_path->print(stream);
   }
 
-  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
+  CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override {
+    return m_path->EvaluateAsType(exe_ctx, error);
+  }
 
 private:
 

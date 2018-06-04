@@ -133,6 +133,7 @@ public:
   void FinishAggregateInitialization(const CompilerType &type);
 
   bool TypeHasDiscriminant(const CompilerType &type);
+  bool IsTupleType(const CompilerType &type);
 
   // Return true and set the out params if the type is a Rust enum;
   // return false otherwise.

@@ -1955,6 +1955,17 @@ RustASTContext::CreateCLikeEnumType(const lldb_private::ConstString &name,
 }
 
 bool
+RustASTContext::IsTupleType(const CompilerType &type) {
+  if (!type)
+    return false;
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  if (!ast)
+    return false;
+  RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
+  return bool(rtype->AsTuple());
+}
+
+bool
 RustASTContext::TypeHasDiscriminant(const CompilerType &type) {
   if (!type)
     return false;

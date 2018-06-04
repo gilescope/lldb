@@ -39,13 +39,17 @@ static std::set<std::string> primitive_type_names
   };
 
 static RustASTContext *
-GetASTContext(ValueObjectSP val, Status &error) {
-  RustASTContext *result =
-    llvm::dyn_cast_or_null<RustASTContext>(val->GetCompilerType().GetTypeSystem());
+GetASTContext(CompilerType type, Status &error) {
+  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
   return result;
+}
+
+static RustASTContext *
+GetASTContext(ValueObjectSP val, Status &error) {
+  return GetASTContext(val->GetCompilerType(), error);
 }
 
 static RustASTContext *
@@ -555,6 +559,15 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
   return true;
 }
 
+CompilerType
+RustPath::EvaluateAsType(ExecutionContext &exe_ctx, Status &error) {
+  std::string fullname = Name(exe_ctx, error);
+  if (error.Fail()) {
+    return CompilerType();
+  }
+  return GetTypeByName(exe_ctx, fullname.c_str(), error);
+}
+
 std::string
 RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
   std::string name;
@@ -926,7 +939,82 @@ RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 }
 
 lldb::ValueObjectSP
+RustCall::MaybeEvalTupleStruct(ExecutionContext &exe_ctx, Status &error) {
+  RustPathExpression *path_expr = m_func->AsPath();
+  if (!path_expr) {
+    return ValueObjectSP();
+  }
+
+  CompilerType type = path_expr->EvaluateAsType(exe_ctx, error);
+  if (!type) {
+    // If we didn't find this as a type, keep trying as a function
+    // call.
+    error.Clear();
+    return ValueObjectSP();
+  }
+
+  // After this point, all errors are real.
+
+  RustASTContext *context = GetASTContext(type, error);
+  if (!context) {
+    return ValueObjectSP();
+  }
+  if (!context->IsTupleType(type)) {
+    error.SetErrorString("not a tuple type");
+    return ValueObjectSP();
+  }
+
+  if (m_exprs.size() < type.GetNumFields()) {
+    error.SetErrorString("not enough initializers for tuple");
+    return ValueObjectSP();
+  } else if (m_exprs.size() > type.GetNumFields()) {
+    error.SetErrorString("too many initializers for tuple");
+    return ValueObjectSP();
+  }
+
+  ValueObjectSP result = CreateValueInMemory(exe_ctx, type, error);
+  if (!result) {
+    return result;
+  }
+
+  for (size_t i = 0; i < m_exprs.size(); ++i) {
+    ValueObjectSP init_val = m_exprs[i]->Evaluate(exe_ctx, error);
+    if (!init_val) {
+      return init_val;
+    }
+
+    DataExtractor data;
+    if (!init_val->GetData(data, error)) {
+      error.SetErrorString("could not get data from value");
+      return ValueObjectSP();
+    }
+
+    ValueObjectSP child = result->GetChildAtIndex(i, true);
+    if (!child) {
+      error.SetErrorStringWithFormat("could not find child at index \"%d\"", int(i));
+      return ValueObjectSP();
+    }
+    if (!child->SetData(data, error)) {
+      return ValueObjectSP();
+    }
+  }
+
+  return result;
+}
+
+lldb::ValueObjectSP
 RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+  error.Clear();
+  ValueObjectSP result = MaybeEvalTupleStruct(exe_ctx, error);
+  if (result) {
+    return result;
+  } else if (error.Fail()) {
+    // This looked like a tuple struct expression but failed.
+    return result;
+  }
+  // This was not a tuple struct expression, so fall through to
+  // function call.
+
   ValueObjectSP func = m_func->Evaluate(exe_ctx, error);
   if (!func) {
     return func;
@@ -985,8 +1073,7 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     return ValueObjectSP();
   }
 
-  ValueObjectSP result = ValueObject::CreateValueObjectFromData("", data, exe_ctx,
-                                                                return_type);
+  result = ValueObject::CreateValueObjectFromData("", data, exe_ctx, return_type);
   if (!result) {
     error.SetErrorString("could not create function return value object");
   }
@@ -1014,9 +1101,15 @@ RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   if (!type) {
     return ValueObjectSP();
   }
+  RustASTContext *context = GetASTContext(type, error);
+  if (!context) {
+    return ValueObjectSP();
+  }
   // FIXME could tighten this to really ensure it is a struct and not
-  // an enum or tuple.
-  if (!type.IsAggregateType() || type.IsArrayType(nullptr, nullptr, nullptr)) {
+  // an enum.
+  if (!type.IsAggregateType() ||
+      type.IsArrayType(nullptr, nullptr, nullptr) ||
+      context->IsTupleType(type)) {
     error.SetErrorStringWithFormat("type \"%s\" is not a structure type",
                                    type.GetDisplayTypeName().AsCString());
     return ValueObjectSP();
@@ -1130,15 +1223,6 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 
 ////////////////////////////////////////////////////////////////
 // Types
-
-CompilerType
-RustPathTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
-  std::string fullname = m_path->Name(exe_ctx, error);
-  if (error.Fail()) {
-    return CompilerType();
-  }
-  return GetTypeByName(exe_ctx, fullname.c_str(), error);
-}
 
 CompilerType
 RustArrayTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {

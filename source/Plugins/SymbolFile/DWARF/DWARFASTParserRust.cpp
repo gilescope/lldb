@@ -418,7 +418,7 @@ std::vector<size_t> DWARFASTParserRust::ParseDiscriminantPath(const char **in_st
     unsigned long value = strtoul(str, &next, 10);
     result.push_back(value);
     str = next;
-    if (*str != '*') {
+    if (*str != '$') {
       // Report an error?
       *in_str = nullptr;
       result.clear();

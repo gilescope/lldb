@@ -93,6 +93,10 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   // mode which would mangle the name and then we couldn't find it again...
   m_wrapper_function_text.clear();
 
+  m_wrapper_function_text.append("extern \"C\" void ");
+  m_wrapper_function_text.append(m_wrapper_function_name);
+  m_wrapper_function_text.append(" (void *input)\n{\n");
+
   // A prologue to handle Rust primitive types.
   m_wrapper_function_text.append("typedef unsigned int __attribute__((mode(QI))) uint8_t;\n");
   m_wrapper_function_text.append("typedef int __attribute__((mode(QI))) int8_t;\n");
@@ -102,10 +106,6 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   m_wrapper_function_text.append("typedef int __attribute__((mode(SI))) int32_t;\n");
   m_wrapper_function_text.append("typedef unsigned int __attribute__((mode(DI))) uint64_t;\n");
   m_wrapper_function_text.append("typedef int __attribute__((mode(DI))) int64_t;\n");
-
-  m_wrapper_function_text.append("extern \"C\" void ");
-  m_wrapper_function_text.append(m_wrapper_function_name);
-  m_wrapper_function_text.append(" (void *input)\n{\n");
 
   // For the Itanium ABI we want to generate a non-standard-layout
   // type, so that ASTStructExtractor can see the length of the type

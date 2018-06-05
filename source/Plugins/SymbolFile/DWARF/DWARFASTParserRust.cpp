@@ -512,6 +512,7 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
   uint64_t naive_discriminant = 0;
 
   bool could_be_enum = die.Tag() == DW_TAG_union_type;
+  bool encoded_enum = false;
 
   ModuleSP module_sp = die.GetModule();
   for (auto &&child_die : IterableDIEChildren(die)) {
@@ -577,12 +578,14 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 
 	      // The actual field is the default variant.
 	      new_field.is_default = true;
+              new_field.name = nullptr;
+              encoded_enum = true;
 	    }
 	  }
 	  break;
 	case DW_AT_type:
 	  new_field.type = attr.second;
-          if (could_be_enum) {
+          if (could_be_enum && !encoded_enum) {
             could_be_enum = IsPossibleEnumVariant(dwarf->GetDIE(DIERef(new_field.type)));
           }
 	  break;
@@ -741,7 +744,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     if (field.is_elided) {
       // A unit-like struct with the given name.  The byte size
       // probably doesn't matter.
-      ConstString name(field.name);
+      ConstString name = FullyQualify(type_name_const_str, die);
+      name = ConstString((std::string(name.AsCString()) + "::" + field.name).c_str());
       field.compiler_type = m_ast.CreateStructType(name, 1, false);
     } else {
       Type *type = die.ResolveTypeUID(DIERef(field.type));

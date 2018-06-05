@@ -70,6 +70,7 @@ fn main() {
 
     let vsimpleenum = SimpleEnum::Two(83, 92);
     let voptenum = OptimizedEnum::Null;
+    let voptenum2 = OptimizedEnum::NonNull(Box::new(7));
 
     do_nothing();               // breakpoint
 }

@@ -25,6 +25,7 @@ class TestRustASTContext(TestBase):
         self.check_main_vars()
         self.check_main_function()
         self.check_structs()
+        self.check_enums()
 
     def setUp(self):
         # Call super's setUp().
@@ -112,9 +113,6 @@ class TestRustASTContext(TestBase):
         mytypelist.append(('&i8', 'vi8ref', address_size, None))
         mytypelist.append(('&mut u8', 'vu8ref', address_size, None))
         mytypelist.append(('main::CLikeEnum', 'vclikeenum', 1, 'main::CLikeEnum::MinusOne'))
-        # FIXME no expected values until we fix printing.
-        mytypelist.append(('main::SimpleEnum', 'vsimpleenum', 6, None)) # 'SimpleEnum::Two(83, 92)'))
-        mytypelist.append(('main::OptimizedEnum', 'voptenum', address_size, None)) # 'OptimizedEnum::Null'))
 
         for (name, vname, size, value) in mytypelist:
             v = self.var(vname)
@@ -157,3 +155,18 @@ class TestRustASTContext(TestBase):
             m1 = vtype.GetFieldAtIndex(1)
             self.assertEqual(m1.GetType().name, 'char')
             self.assertEqual(m1.GetName(), m1name)
+
+    def check_enums(self):
+        address_size = self.target().GetAddressByteSize()
+        mytypelist = []
+        mytypelist.append(('main::SimpleEnum::Two', 'vsimpleenum', 6, '(83, 92)'))
+        mytypelist.append(('main::OptimizedEnum::Null', 'voptenum', address_size, '{}'))
+        mytypelist.append(('main::OptimizedEnum::NonNull', 'voptenum2', address_size, None))
+        for (name, vname, size, value) in mytypelist:
+            v = self.var(vname).dynamic
+            self.assertEqual(name, v.GetType().name)
+            self.assertEqual(size, v.GetType().GetByteSize())
+            # Some values can't really be checked.
+            if value is not None:
+                expected = "(" + name + ") " + vname + " = " + value
+                self.assertEqual(expected, str(v.dynamic))

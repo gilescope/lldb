@@ -1026,6 +1026,14 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   CompilerType function_type = func->GetCompilerType().GetPointeeType();
   CompilerType return_type = function_type.GetFunctionReturnType();
 
+  if (m_exprs.size() < function_type.GetNumberOfFunctionArguments()) {
+    error.SetErrorString("too few arguments to function");
+    return ValueObjectSP();
+  } else if (m_exprs.size() > function_type.GetNumberOfFunctionArguments()) {
+    error.SetErrorString("too many arguments to function");
+    return ValueObjectSP();
+  }
+
   addr_t addr = func->GetPointerValue();
   Address func_addr(addr);
 

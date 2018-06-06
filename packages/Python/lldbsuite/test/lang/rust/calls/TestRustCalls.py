@@ -78,5 +78,5 @@ class TestRustExpressions(TestBase):
         # self.assertEqual("(u16)  = 99", str(v))
         # v = frame.EvaluateExpression("add1ue(UnivariantEnum::Single(17)).0")
         # self.assertEqual("(u8)  = 18", str(v))
-        # v = frame.EvaluateExpression("sum(0, 1, 2, 3.0, 4.0)")
-        # self.assertEqual("(f64)  = 10", str(v))
+        v = frame.EvaluateExpression("sum(0, 1, 2, 3.0, 4.0)")
+        self.assertEqual("(f64)  = 10", str(v))

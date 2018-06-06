@@ -130,14 +130,23 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
     return 1;
   }
 
+  // This was ensured by the caller.
+  assert(unsigned(m_function_type.GetNumberOfFunctionArguments()) == m_arg_values.GetSize());
+
   std::string arguments;
   for (int i = 0; i < m_function_type.GetFunctionArgumentCount(); ++i) {
-    CompilerType arg_type = m_function_type.GetFunctionArgumentTypeAtIndex(i);
-    // FIXME work around a FunctionCaller problem.
-    bool is_aggregate = arg_type.IsAggregateType();
-    if (is_aggregate) {
-      arg_type = arg_type.GetPointerType();
-    }
+    // We use the actual argument types in this structure so that
+    // copy-in always preserves values, and then we let the C++
+    // compiler do any scalar conversions.  Rust doesn't have
+    // coercions like this, but it has type inferencing, which we
+    // don't, so this is handy for users who want to write "32"
+    // instead of "32f32".
+    CompilerType arg_type = m_arg_values.GetValueAtIndex(i)->GetCompilerType();
+
+    // FIXME work around a FunctionCaller problem.  Note that the
+    // actual argument is already a pointer at this point, see
+    // RustParse.
+    bool is_aggregate = m_function_type.GetFunctionArgumentTypeAtIndex(i).IsAggregateType();
 
     std::string argname = "__arg_" + std::to_string(i);
     if (!AppendType(&code, ast, &name_map, argname, arg_type)) {
